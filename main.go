@@ -63,6 +63,8 @@ func determineOutputFileName(inputFile string, decrypt bool) string {
 	} else {
 		// Use a generic .pcd extension without exposing the original file type
 		outputFile = strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile)) + ".pcd"
+		dir := filepath.Dir(inputFile)
+		outputFile = filenameClearance(dir + "/" + outputFile)
 	}
 	return outputFile
 }
@@ -143,9 +145,32 @@ func decompressData(data []byte, codes map[rune]string, inputFile, outputFile, o
 	utils.ColorPrint(utils.GREEN, fmt.Sprintf("File %s processed successfully. Output file: %s\n", inputFile, outputFile))
 }
 
+func filenameClearance(file string) string {
+	//if exist, rename
+	if _, err := os.Stat(file); err == nil {
+		i := 1
+		for {
+			file = fmt.Sprintf("%s_%d", file, i)
+			if _, err := os.Stat(file); err != nil {
+				break
+			}
+			i++
+		}
+	}
+
+	return file
+}
+
+
 func performCombinedCompression(files []string, password string) {
+
+	dir := filepath.Dir(files[0])
+
 	// Prepare combined output file name
-	outputFile := "combined.pcd"
+	outputFile := dir + "/files.pcd"
+
+	//if file exists then rename with number
+	outputFile = filenameClearance(outputFile)
 
 	// Create a wait group to manage go routines
 	var wg sync.WaitGroup
