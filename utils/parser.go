@@ -1,34 +1,34 @@
 package utils
 
 import (
-    "flag"
-    "fmt"
-    "os"
+	"flag"
+	"fmt"
+	"os"
 )
 
 type Options struct {
-    InputFile  string
-    OutputFile string
-    Password   string
+	InputFile  string
+	OutputFile string
+	Password   string
 }
 
 func ParseCommandLine() *Options {
-    inputFile := flag.String("i", "", "Input file to be compressed")
-    outputFile := flag.String("o", "compressed.pcd", "Output compressed file name")
-    password := flag.String("p", "", "Password for encryption (optional)")
-    flag.Parse()
+	inputFile := flag.String("i", "", "Input file to be compressed")
+	outputFile := flag.String("o", "compressed.pcd", "Output compressed file name")
+	password := flag.String("p", "", "Password for encryption (optional)")
+	flag.Parse()
 
-    if *inputFile == "" {
-        fmt.Println("Input file is required.")
-        flag.Usage()
-        os.Exit(1)
-    }
+	if *inputFile == "" {
+		fmt.Println("Input file is required.")
+		flag.Usage()
+		os.Exit(1)
+	}
 
-    return &Options{
-        InputFile:  *inputFile,
-        OutputFile: *outputFile,
-        Password:   *password,
-    }
+	return &Options{
+		InputFile:  *inputFile,
+		OutputFile: *outputFile,
+		Password:   *password,
+	}
 }
 
 type COLOR string

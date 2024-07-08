@@ -6,8 +6,8 @@ import (
 	"os"
 )
 
-// WriteCompressedFile writes the compressed data, codes, and encryption flag to a file
-func WriteCompressedFile(filename string, compressed []byte, codes map[rune]string, encrypted bool) error {
+// WriteCompressedFile writes the compressed data, codes, encryption flag, and original file extension to a file
+func WriteCompressedFile(filename string, compressed []byte, codes map[rune]string, encrypted bool, originalExt string) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 
@@ -21,6 +21,11 @@ func WriteCompressedFile(filename string, compressed []byte, codes map[rune]stri
 		return err
 	}
 
+	// Write original file extension
+	if err := enc.Encode(originalExt); err != nil {
+		return err
+	}
+
 	// Write compressed data
 	if _, err := buf.Write(compressed); err != nil {
 		return err
@@ -29,12 +34,12 @@ func WriteCompressedFile(filename string, compressed []byte, codes map[rune]stri
 	return os.WriteFile(filename, buf.Bytes(), 0644)
 }
 
-// ReadCompressedFile reads the compressed data and codes from a file and checks the encryption flag
-func ReadCompressedFile(filename string) ([]byte, map[rune]string, bool, error) {
+// ReadCompressedFile reads the compressed data, codes, encryption flag, and original file extension from a file
+func ReadCompressedFile(filename string) ([]byte, map[rune]string, bool, string, error) {
 	// Read entire file content
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, "", err
 	}
 
 	// Initialize a buffer with file content
@@ -46,15 +51,23 @@ func ReadCompressedFile(filename string) ([]byte, map[rune]string, bool, error) 
 	// Read encryption flag
 	var encrypted bool
 	if err := dec.Decode(&encrypted); err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, "", err
 	}
 
 	// Read codes
 	var codes map[rune]string
 	if err := dec.Decode(&codes); err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, "", err
 	}
 
-    // Return the remaining data as compressed data
-    return buf.Bytes(), codes, encrypted, nil
+	// Read original file extension
+	var originalExt string
+	if err := dec.Decode(&originalExt); err != nil {
+		return nil, nil, false, "", err
+	}
+
+	// Read the remaining data as compressed data
+	compressedData := buf.Bytes()
+
+	return compressedData, codes, encrypted, originalExt, nil
 }
