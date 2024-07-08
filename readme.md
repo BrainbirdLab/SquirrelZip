@@ -5,7 +5,7 @@ Simple CLI-tool for compressing files using Huffman coding algorithm.
 ## Usage
 Build
 ```bash
-go build main.go -o compress
+go build -o compress main.go
 ```
 
 Run
