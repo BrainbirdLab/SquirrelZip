@@ -7,10 +7,11 @@ import (
 )
 
 
-func ParseCLI() ([]string, *string, *bool) {
+func ParseCLI() ([]string, *string, *string, *bool) {
 	//cli arguments
 	inputFiles := flag.String("i", "", "Input files to be compressed")
 	outputDir := flag.String("o", "", "Output directory for compressed files (Optional)")
+	password := flag.String("p", "", "Password for encryption (Optional)")
 	readAllFiles := flag.Bool("a", false, "Read all files in the test directory")
 	decompressMode := flag.Bool("d", false, "Decompress mode")
 	flag.Parse()
@@ -56,5 +57,5 @@ func ParseCLI() ([]string, *string, *bool) {
 		}
 	}
 
-	return filenameStrs, outputDir, decompressMode
+	return filenameStrs, outputDir, password, decompressMode
 }

@@ -1,20 +1,20 @@
 package compressor
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"path"
-	"bytes"
-	"encoding/binary"
-
 
 	"file-compressor/utils"
 )
 
-func Compress(filenameStrs []string, outputDir *string) {
+func Compress(filenameStrs []string, outputDir *string, password *string) error {
+
 	if len(filenameStrs) == 0 {
-		utils.ColorPrint(utils.RED, "No files to compress\n")
-		return
+		return errors.New("no files to compress")
 	}
 
 	if *outputDir == "" {
@@ -27,14 +27,12 @@ func Compress(filenameStrs []string, outputDir *string) {
 	for _, filename := range filenameStrs {
 		// Read file content and append to files
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			utils.ColorPrint(utils.RED, "File does not exist.\n")
-			return
+			return errors.New("file does not exist")
 		}
 
 		content, err := os.ReadFile(filename)
 		if err != nil {
-			utils.ColorPrint(utils.RED, err.Error() + "\n")
-			return
+			return err
 		}
 
 		files = append(files, utils.File{
@@ -46,14 +44,23 @@ func Compress(filenameStrs []string, outputDir *string) {
 	// Compress files
 	compressedFile := Zip(files)
 
+	var err error
+
+	compressedFile.Content, err = utils.Encrypt(compressedFile.Content, *password)
+
+	if err != nil {
+		return err
+	}
+
 	// Write compressed file in the current directory + /compressed directory
 	os.WriteFile(*outputDir + "/" + compressedFile.Name, compressedFile.Content, 0644)
+
+	return nil
 }
 
-func Decompress(filenameStrs []string, outputDir *string) {
+func Decompress(filenameStrs []string, outputDir *string, password *string) error {
 	if len(filenameStrs) == 0 {
-		utils.ColorPrint(utils.RED, "No files to decompress.\n")
-		return
+		return errors.New("no files to decompress")
 	}
 
 	if *outputDir == "" {
@@ -62,14 +69,17 @@ func Decompress(filenameStrs []string, outputDir *string) {
 
 	// Read compressed file
 	if _, err := os.Stat(filenameStrs[0]); os.IsNotExist(err) {
-		utils.ColorPrint(utils.RED, "File does not exist.\n")
-		return
+		return errors.New("file does not exist")
 	}
 
 	content, err := os.ReadFile(filenameStrs[0])
 	if err != nil {
-		utils.ColorPrint(utils.RED, err.Error() + "\n")
-		return
+		return err
+	}
+
+	content, err = utils.Decrypt(content, *password)
+	if err != nil {
+		return err
 	}
 
 	// Unzip file
@@ -80,9 +90,11 @@ func Decompress(filenameStrs []string, outputDir *string) {
 
 	// Write decompressed files
 	for _, file := range files {
-		utils.ColorPrint(utils.RED, fmt.Sprintf("Decompressed file: %s\n", file.Name))
+		utils.ColorPrint(utils.GREEN, fmt.Sprintf("Decompressed file: %s\n", file.Name))
 		os.WriteFile(*outputDir + "/" + file.Name, file.Content, 0644)
 	}
+
+	return nil
 }
 
 

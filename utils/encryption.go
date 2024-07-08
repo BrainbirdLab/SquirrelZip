@@ -3,41 +3,75 @@ package utils
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
 	"crypto/rand"
 	"errors"
 	"io"
 )
+// Constants
+const (
+	MetadataLength = 1 // Length of the metadata
+)
 
-// generateKey creates a key of the appropriate length for AES encryption.
+// Function to generate key from password
 func generateKey(password string) ([]byte, error) {
-	if len(password) == 0 {
-		return nil, errors.New("password cannot be empty")
+	key := []byte(password)
+	if len(key) > 32 {
+		return nil, errors.New("password too long")
 	}
-	hash := md5.New()
-	hash.Write([]byte(password))
-	return hash.Sum(nil), nil
+	for len(key) < 32 {
+		key = append(key, '0')
+	}
+	return key, nil
 }
 
-func Encrypt(data []byte, password string) []byte {
+// Encrypt function
+func Encrypt(data []byte, password string) ([]byte, error) {
+	var metadata byte
+
+	if password == "" {
+		metadata = 0 // 0 indicates no password was used
+		return append([]byte{metadata}, data...), nil
+	}
+
+	metadata = 1 // 1 indicates a password was used
 	key, err := generateKey(password)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	nonce := make([]byte, gcm.NonceSize())
-	io.ReadFull(rand.Reader, nonce)
-	return gcm.Seal(nonce, nonce, data, nil)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	encryptedData := gcm.Seal(nonce, nonce, data, nil)
+	return append([]byte{metadata}, encryptedData...), nil
 }
 
+// Decrypt function
 func Decrypt(data []byte, password string) ([]byte, error) {
+	if len(data) < MetadataLength {
+		return nil, errors.New("invalid data")
+	}
+
+	metadata := data[0]
+	data = data[MetadataLength:]
+
+	if metadata == 0 {
+		// No password was used
+		return data, nil
+	}
+
+	if password == "" {
+		return nil, errors.New("password is required")
+	}
+
 	key, err := generateKey(password)
 	if err != nil {
 		return nil, err
@@ -55,5 +89,11 @@ func Decrypt(data []byte, password string) ([]byte, error) {
 		return nil, errors.New("ciphertext too short")
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	return gcm.Open(nil, nonce, ciphertext, nil)
+
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, errors.New("incorrect password")
+	}
+
+	return plaintext, nil
 }

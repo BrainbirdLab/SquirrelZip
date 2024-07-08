@@ -3,6 +3,7 @@ package main
 import (
 	"file-compressor/compressor"
 	"file-compressor/utils"
+	"os"
 )
 
 
@@ -10,13 +11,20 @@ func main() {
 	//test files path '/test'
 
 	//cli arguments
-	filenameStrs, outputDir, decompressMode := utils.ParseCLI()
+	filenameStrs, outputDir, password, decompressMode := utils.ParseCLI()
+
+	var err error
 
 	if *decompressMode {
-		compressor.Decompress(filenameStrs, outputDir)
+		err = compressor.Decompress(filenameStrs, outputDir, password)
 	} else {
-		compressor.Compress(filenameStrs, outputDir)
+		err = compressor.Compress(filenameStrs, outputDir, password)
 	}
 
+	if err != nil {
+		utils.ColorPrint(utils.RED, err.Error() + "\n")
+		os.Exit(1)
+	}
+	
 	utils.ColorPrint(utils.GREEN, "Done\n")
 }
