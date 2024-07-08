@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/heap"
 	"encoding/binary"
+	"errors"
 	"io"
 )
 
@@ -164,4 +165,38 @@ func Decompress(data []byte, codes map[rune]string) ([]byte, error) {
 	}
 
 	return decodedData, nil
+}
+
+// DecompressMultipleFiles decompresses multiple files from the input data using Huffman coding.
+func DecompressMultipleFiles(data []byte, codes map[rune]string) ([][]byte, error) {
+	var filesData [][]byte
+	reader := bytes.NewReader(data)
+
+	for {
+		// Read the compressed file size
+		sizeBytes := make([]byte, 4)
+		if _, err := io.ReadFull(reader, sizeBytes); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+		fileSize := int(binary.LittleEndian.Uint32(sizeBytes))
+
+		// Read the compressed file data
+		compressedData := make([]byte, fileSize)
+		if _, err := io.ReadFull(reader, compressedData); err != nil {
+			return nil, err
+		}
+
+		// Decompress the file data
+		decompressedData, err := Decompress(compressedData, codes)
+		if err != nil {
+			return nil, err
+		}
+
+		filesData = append(filesData, decompressedData)
+	}
+
+	return filesData, nil
 }
