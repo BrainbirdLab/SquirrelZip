@@ -9,12 +9,24 @@ import (
 
 func ParseCLI() ([]string, *string, *string, *bool) {
 	//cli arguments
+
+	//if -v or --version is passed then skip the other flags
+	version := flag.Bool("v", false, "Print version")
 	inputFiles := flag.String("i", "", "Input files to be compressed")
 	outputDir := flag.String("o", "", "Output directory for compressed files (Optional)")
 	password := flag.String("p", "", "Password for encryption (Optional)")
 	readAllFiles := flag.Bool("a", false, "Read all files in the test directory")
 	decompressMode := flag.Bool("d", false, "Decompress mode")
 	flag.Parse()
+
+	if *version {
+		ColorPrint(WHITE, "---------- PI ARCHIVER ----------\n")
+		ColorPrint(YELLOW, "Version: v0.0.2\n")
+		//dev info
+		ColorPrint(WHITE, "Developed by: https://github.com/itsfuad/\n")
+		ColorPrint(WHITE, "---------------------------------")
+		os.Exit(0)
+	}
 
 	if *inputFiles == "" {
 		ColorPrint(RED, "No input files provided\n")

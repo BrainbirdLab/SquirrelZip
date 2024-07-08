@@ -1,3 +1,5 @@
+// go: generate goversioninfo -icon = icon_piarchiver.ico
+
 package main
 
 import (
@@ -25,6 +27,6 @@ func main() {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
 		os.Exit(1)
 	}
-	
+
 	utils.ColorPrint(utils.GREEN, "Done\n")
 }
