@@ -7,101 +7,170 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 
 	"file-compressor/utils"
 )
 
+// Compress compresses the specified files into a single compressed file.
 func Compress(filenameStrs []string, outputDir *string, password *string) error {
-
+	// Check if there are files to compress
 	if len(filenameStrs) == 0 {
 		return errors.New("no files to compress")
 	}
 
+	// Set default output directory if not provided
 	if *outputDir == "" {
 		*outputDir = path.Dir(filenameStrs[0])
 	}
 
+	// Prepare to store files' content
 	var files []utils.File
 
-	// Read files
+	// Use a wait group to synchronize goroutines
+	var wg sync.WaitGroup
+	var errMutex sync.Mutex // Mutex to handle errors safely
+
+	// Channel to receive errors from goroutines
+	errChan := make(chan error, len(filenameStrs))
+
+	// Read files and store their content concurrently
 	for _, filename := range filenameStrs {
-		// Read file content and append to files
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			return errors.New("file does not exist")
-		}
+		wg.Add(1)
+		go func(filename string) {
+			defer wg.Done()
 
-		content, err := os.ReadFile(filename)
-		if err != nil {
-			return err
-		}
+			// Check if the file exists
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				errChan <- fmt.Errorf("file does not exist: %s", filename)
+				return
+			}
 
-		files = append(files, utils.File{
-			Name:   path.Base(filename),
-			Content: content,
-		})
+			// Read file content
+			content, err := os.ReadFile(filename)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to read file %s: %w", filename, err)
+				return
+			}
+
+			// Store file information (name and content)
+			files = append(files, utils.File{
+				Name:    path.Base(filename),
+				Content: content,
+			})
+		}(filename)
 	}
 
-	// Compress files
+	// Wait for all goroutines to finish
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors from goroutines
+	for err := range errChan {
+		if err != nil {
+			errMutex.Lock()
+			defer errMutex.Unlock()
+			return err // Return the first error encountered
+		}
+	}
+
+	// Compress files using Huffman coding
 	compressedFile := Zip(files)
 
-	var err error
-
-	compressedFile.Content, err = utils.Encrypt(compressedFile.Content, *password)
-
-	if err != nil {
-		return err
+	// Encrypt compressed content if password is provided
+	if password != nil && *password != "" {
+		var err error
+		compressedFile.Content, err = utils.Encrypt(compressedFile.Content, *password)
+		if err != nil {
+			return fmt.Errorf("encryption error: %w", err)
+		}
 	}
 
-	// Write compressed file in the current directory + /compressed directory
-	os.WriteFile(*outputDir + "/" + compressedFile.Name, compressedFile.Content, 0644)
+	// Write compressed file to the output directory
+	err := os.WriteFile(*outputDir+"/"+compressedFile.Name, compressedFile.Content, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write compressed file: %w", err)
+	}
 
 	return nil
 }
 
+
+// Decompress decompresses the specified compressed file into individual files.
 func Decompress(filenameStrs []string, outputDir *string, password *string) error {
+	// Check if there are files to decompress
 	if len(filenameStrs) == 0 {
 		return errors.New("no files to decompress")
 	}
 
+	// Set default output directory if not provided
 	if *outputDir == "" {
 		*outputDir = path.Dir(filenameStrs[0])
 	}
 
-	// Read compressed file
-	if _, err := os.Stat(filenameStrs[0]); os.IsNotExist(err) {
-		return errors.New("file does not exist")
-	}
-
-	content, err := os.ReadFile(filenameStrs[0])
+	// Read compressed file content
+	compressedContent, err := os.ReadFile(filenameStrs[0])
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read compressed file %s: %w", filenameStrs[0], err)
 	}
 
-	content, err = utils.Decrypt(content, *password)
-	if err != nil {
-		return err
+	// Decrypt compressed content if password is provided
+	if password != nil && *password != "" {
+		compressedContent, err = utils.Decrypt(compressedContent, *password)
+		if err != nil {
+			return fmt.Errorf("decryption error: %w", err)
+		}
 	}
 
-	// Unzip file
+	// Decompress file using Huffman coding
 	files := Unzip(utils.File{
 		Name:    path.Base(filenameStrs[0]),
-		Content: content,
+		Content: compressedContent,
 	})
 
-	// Write decompressed files
+	// Use a wait group to synchronize goroutines
+	var wg sync.WaitGroup
+	var errMutex sync.Mutex // Mutex to handle errors safely
+
+	// Channel to receive errors from goroutines
+	errChan := make(chan error, len(files))
+
+	// Write decompressed files to the output directory concurrently
 	for _, file := range files {
-		utils.ColorPrint(utils.GREEN, fmt.Sprintf("Decompressed file: %s\n", file.Name))
-		os.WriteFile(*outputDir + "/" + file.Name, file.Content, 0644)
+		wg.Add(1)
+		go func(file utils.File) {
+			defer wg.Done()
+
+			err := os.WriteFile(*outputDir+"/"+file.Name, file.Content, 0644)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to write decompressed file %s: %w", file.Name, err)
+				return
+			}
+			utils.ColorPrint(utils.GREEN, fmt.Sprintf("Decompressed file: %s\n", file.Name))
+		}(file)
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors from goroutines
+	for err := range errChan {
+		if err != nil {
+			errMutex.Lock()
+			defer errMutex.Unlock()
+			return err // Return the first error encountered
+		}
 	}
 
 	return nil
 }
 
-
+// Zip compresses files using Huffman coding and returns a compressed file object.
 func Zip(files []utils.File) utils.File {
 	var buf bytes.Buffer
 
-	// Write header count of files
+	// Write the number of files in the header
 	binary.Write(&buf, binary.BigEndian, uint32(len(files)))
 
 	// Create raw content buffer
@@ -142,11 +211,12 @@ func Zip(files []utils.File) utils.File {
 	}
 
 	return utils.File{
-		Name:   	"compressed.bin",
-		Content: 	buf.Bytes(),
+		Name:    "compressed.bin",
+		Content: buf.Bytes(),
 	}
 }
 
+// Unzip decompresses a compressed file using Huffman coding and returns individual files.
 func Unzip(file utils.File) []utils.File {
 	var files []utils.File
 
@@ -211,7 +281,7 @@ func Unzip(file utils.File) []utils.File {
 	return files
 }
 
-
+// compressData compresses data using Huffman codes.
 func compressData(data []byte, codes map[rune]string) []byte {
 	var buf bytes.Buffer
 	var bitBuffer uint64
@@ -238,6 +308,7 @@ func compressData(data []byte, codes map[rune]string) []byte {
 	return buf.Bytes()
 }
 
+// decompressData decompresses data using Huffman codes.
 func decompressData(data []byte, root *Node) []byte {
 	var buf bytes.Buffer
 	if root == nil {

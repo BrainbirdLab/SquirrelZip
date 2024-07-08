@@ -4,38 +4,45 @@ import (
 	"container/heap"
 )
 
-// Huffman coding structures
+// Node represents a node in the Huffman tree
 type Node struct {
-	char  rune
-	freq  int
-	left  *Node
-	right *Node
+	char  rune    // Character stored in the node
+	freq  int     // Frequency of the character
+	left  *Node   // Left child node
+	right *Node   // Right child node
 }
 
+// PriorityQueue implements heap.Interface and holds Nodes
 type PriorityQueue []*Node
 
+// Len returns the number of items in the priority queue
 func (pq PriorityQueue) Len() int { return len(pq) }
 
+// Less defines the ordering of items in the priority queue based on frequency
 func (pq PriorityQueue) Less(i, j int) bool {
 	return pq[i].freq < pq[j].freq
 }
 
+// Swap swaps two items in the priority queue
 func (pq PriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 }
 
+// Push adds an item (Node) to the priority queue
 func (pq *PriorityQueue) Push(x interface{}) {
 	*pq = append(*pq, x.(*Node))
 }
 
+// Pop removes and returns the highest priority item (Node) from the priority queue
 func (pq *PriorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
-	*pq = old[0:n-1]
+	*pq = old[0 : n-1]
 	return item
 }
 
+// buildHuffmanTree builds the Huffman tree from character frequencies
 func buildHuffmanTree(freq map[rune]int) *Node {
 	pq := make(PriorityQueue, len(freq))
 	i := 0
@@ -64,6 +71,7 @@ func buildHuffmanTree(freq map[rune]int) *Node {
 	return nil
 }
 
+// buildHuffmanCodes builds Huffman codes (bit strings) for each character
 func buildHuffmanCodes(root *Node) map[rune]string {
 	codes := make(map[rune]string)
 	var build func(node *Node, code string)
@@ -82,8 +90,7 @@ func buildHuffmanCodes(root *Node) map[rune]string {
 	return codes
 }
 
-
-
+// rebuildHuffmanTree reconstructs the Huffman tree from Huffman codes
 func rebuildHuffmanTree(codes map[rune]string) *Node {
 	var root *Node
 	for char, code := range codes {
