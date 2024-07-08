@@ -13,10 +13,14 @@ Run
 ./compress -i <file1,file2> -o <outputDir>
 ```
 
-
->  -a    Read all files in the test directory
->  -d    Decompress mode
->  -i string
->       Input files to be compressed
->  -o string
->       Output directory for compressed files (Optional)
+```bash
+  -a    Read all files in the test directory
+  -d    Decompress mode
+  -i string
+        Input files to be compressed
+  -o string
+        Output directory for compressed files (Optional)
+  -p string
+        Password for encryption (Optional)
+  -v    Print version
+```
