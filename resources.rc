@@ -15,10 +15,10 @@ FILETYPE 0x1
             VALUE "CompanyName", "BrainbirdLab"
             VALUE "FileDescription", "File Compress-Encryption program"
             VALUE "FileVersion", "0.0.2"
-            VALUE "InternalName", "piarchiver"
+            VALUE "InternalName", "piarch"
             VALUE "LegalCopyright", "BrainbirdLab"
-            VALUE "OriginalFilename", "piarchiver"
-            VALUE "ProductName", "PiArchiver"
+            VALUE "OriginalFilename", "piarch"
+            VALUE "ProductName", "piarch"
             VALUE "ProductVersion", "0.0.2"
             VALUE "Author", "Fuad Hasan"
         }
