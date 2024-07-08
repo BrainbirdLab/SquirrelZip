@@ -1,69 +1,71 @@
+//parseCLI.go
+
 package utils
 
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-
 func ParseCLI() ([]string, *string, *string, *bool) {
-	//cli arguments
-
-	//if -v or --version is passed then skip the other flags
+	// CLI arguments
 	version := flag.Bool("v", false, "Print version")
-	inputFiles := flag.String("i", "", "Input files to be compressed")
+	inputFiles := flag.String("i", "", "Input files or directory to be compressed")
 	outputDir := flag.String("o", "", "Output directory for compressed files (Optional)")
 	password := flag.String("p", "", "Password for encryption (Optional)")
-	readAllFiles := flag.Bool("a", false, "Read all files in the test directory")
+	readAllFiles := flag.Bool("a", false, "Read all files in the input directory")
 	decompressMode := flag.Bool("d", false, "Decompress mode")
 	flag.Parse()
 
 	if *version {
 		ColorPrint(WHITE, "---------- PI ARCHIVER ----------\n")
 		ColorPrint(YELLOW, "Version: v0.0.2\n")
-		//dev info
+		// dev info
 		ColorPrint(WHITE, "Developed by: https://github.com/itsfuad/\n")
 		ColorPrint(WHITE, "---------------------------------")
 		os.Exit(0)
 	}
 
 	if *inputFiles == "" {
-		ColorPrint(RED, "No input files provided\n")
+		ColorPrint(RED, "No input files or directory provided\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// Read all files
 	var filenameStrs []string
 
-	// Split input files by comma and trim spaces and quotes(if any, `'` | `"`)
-
+	// Handle reading all files in the input directory
 	if *readAllFiles {
-
-		//filenameStrs is the folder name
-		dir := inputFiles
-		//if dir exists
-		if _, err := os.Stat(*dir); os.IsNotExist(err) {
-			ColorPrint(RED, "Directory does not exist.\n")
+		// Check if input is a directory
+		info, err := os.Stat(*inputFiles)
+		if os.IsNotExist(err) {
+			ColorPrint(RED, "Input directory does not exist.\n")
 			os.Exit(1)
 		}
 
-		//read all filenames in the directory
-		files, err := os.ReadDir(*dir)
-		if err != nil {
-			ColorPrint(RED, err.Error()+"\n")
+		if !info.IsDir() {
+			ColorPrint(RED, "Provided input is not a directory.\n")
 			os.Exit(1)
 		}
 
-		for _, file := range files {
-			if file.IsDir() {
-				continue
+		// Read all files in the directory
+		err = filepath.Walk(*inputFiles, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
 			}
-
-			filenameStrs = append(filenameStrs, *dir+"/"+file.Name())
+			if !info.IsDir() {
+				filenameStrs = append(filenameStrs, path)
+			}
+			return nil
+		})
+		if err != nil {
+			ColorPrint(RED, err.Error())
+			os.Exit(1)
 		}
 	} else {
+		// Split input files by comma and trim spaces and quotes (if any)
 		for _, filename := range strings.Split(*inputFiles, ",") {
 			filenameStrs = append(filenameStrs, strings.Trim(filename, " '\""))
 		}

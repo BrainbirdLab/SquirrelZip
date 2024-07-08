@@ -8,15 +8,16 @@ import (
 	"os"
 	"path"
 	"sync"
+	"path/filepath"
 
 	"file-compressor/utils"
 )
 
-// Compress compresses the specified files into a single compressed file.
+// Compress compresses the specified files or folders into a single compressed file.
 func Compress(filenameStrs []string, outputDir *string, password *string) error {
-	// Check if there are files to compress
+	// Check if there are files or folders to compress
 	if len(filenameStrs) == 0 {
-		return errors.New("no files to compress")
+		return errors.New("no files or folders to compress")
 	}
 
 	// Set default output directory if not provided
@@ -34,30 +35,39 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 	// Channel to receive errors from goroutines
 	errChan := make(chan error, len(filenameStrs))
 
-	// Read files and store their content concurrently
+	// Process each input file or folder
 	for _, filename := range filenameStrs {
 		wg.Add(1)
 		go func(filename string) {
 			defer wg.Done()
 
-			// Check if the file exists
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				errChan <- fmt.Errorf("file does not exist: %s", filename)
+			// Check if the file or folder exists
+			info, err := os.Stat(filename)
+			if os.IsNotExist(err) {
+				errChan <- fmt.Errorf("file or folder does not exist: %s", filename)
 				return
 			}
 
-			// Read file content
-			content, err := os.ReadFile(filename)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to read file %s: %w", filename, err)
-				return
-			}
+			// Handle directory recursively
+			if info.IsDir() {
+				err := compressFolderRecursive(filename, &files)
+				if err != nil {
+					errChan <- err
+				}
+			} else {
+				// Read file content
+				content, err := os.ReadFile(filename)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to read file %s: %w", filename, err)
+					return
+				}
 
-			// Store file information (name and content)
-			files = append(files, utils.File{
-				Name:    path.Base(filename),
-				Content: content,
-			})
+				// Store file information (name and content)
+				files = append(files, utils.File{
+					Name:    path.Base(filename),
+					Content: content,
+				})
+			}
 		}(filename)
 	}
 
@@ -95,8 +105,42 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 	return nil
 }
 
+// Function to recursively compress a folder and its contents
+func compressFolderRecursive(folderPath string, files *[]utils.File) error {
+	// Traverse the folder contents
+	err := filepath.Walk(folderPath, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			// Read file content
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %w", filePath, err)
+			}
 
-// Decompress decompresses the specified compressed file into individual files.
+			filename, err := filepath.Rel(folderPath, filePath)
+			if err != nil {
+				return fmt.Errorf("failed to get relative path for file %s: %w", filePath, err)
+			}
+
+			// Store file information (relative path and content)
+			*files = append(*files, utils.File{
+				Name:    filepath.ToSlash(filename), // Store relative path
+				Content: content,
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("error compressing folder %s: %w", folderPath, err)
+	}
+
+	return nil
+}
+
+// Decompress decompresses the specified compressed file into individual files or folders.
 func Decompress(filenameStrs []string, outputDir *string, password *string) error {
 	// Check if there are files to decompress
 	if len(filenameStrs) == 0 {
@@ -135,13 +179,22 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 	// Channel to receive errors from goroutines
 	errChan := make(chan error, len(files))
 
-	// Write decompressed files to the output directory concurrently
+	// Process each decompressed file
 	for _, file := range files {
 		wg.Add(1)
 		go func(file utils.File) {
 			defer wg.Done()
 
-			err := os.WriteFile(*outputDir+"/"+file.Name, file.Content, 0644)
+			// Create directories if they don't exist
+			outputPath := filepath.Join(*outputDir, filepath.Dir(file.Name))
+			err := os.MkdirAll(outputPath, os.ModePerm)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to create directory %s: %w", outputPath, err)
+				return
+			}
+
+			// Write decompressed file content
+			err = os.WriteFile(filepath.Join(*outputDir, file.Name), file.Content, 0644)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to write decompressed file %s: %w", file.Name, err)
 				return
