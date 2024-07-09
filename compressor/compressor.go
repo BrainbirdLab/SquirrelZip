@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"file-compressor/utils"
+	"file-compressor/encryption"
 )
 
 // Compress compresses the specified files or folders into a single compressed file.
@@ -90,7 +91,7 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 	// Encrypt compressed content if password is provided
 	if password != nil && *password != "" {
 		var err error
-		compressedFile.Content, err = utils.Encrypt(compressedFile.Content, *password)
+		compressedFile.Content, err = encryption.Encrypt(compressedFile.Content, *password)
 		if err != nil {
 			return fmt.Errorf("encryption error: %w", err)
 		}
@@ -160,7 +161,7 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 
 	// Decrypt compressed content if password is provided
 	if password != nil && *password != "" {
-		compressedContent, err = utils.Decrypt(compressedContent, *password)
+		compressedContent, err = encryption.Decrypt(compressedContent, *password)
 		if err != nil {
 			return fmt.Errorf("decryption error: %w", err)
 		}

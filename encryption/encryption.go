@@ -1,4 +1,4 @@
-package utils
+package encryption
 
 import (
 	"crypto/aes"
@@ -11,18 +11,6 @@ import (
 const (
 	MetadataLength = 1 // Length of the metadata
 )
-
-// Function to generate key from password
-func generateKey(password string) ([]byte, error) {
-	key := []byte(password)
-	if len(key) > 32 {
-		return nil, errors.New("password too long")
-	}
-	for len(key) < 32 {
-		key = append(key, '0')
-	}
-	return key, nil
-}
 
 // Encrypt function
 func Encrypt(data []byte, password string) ([]byte, error) {
