@@ -3,8 +3,8 @@
 IDI_ICON1 ICON "icon.ico"
 
 1 VERSIONINFO
-FILEVERSION 0,0,4
-PRODUCTVERSION 0,0,4
+FILEVERSION 0,0,5
+PRODUCTVERSION 0,0,5
 FILEOS 0x4
 FILETYPE 0x1
 {
@@ -14,12 +14,12 @@ FILETYPE 0x1
         {
             VALUE "CompanyName", "BrainbirdLab"
             VALUE "FileDescription", "File Compress-Encryption program"
-            VALUE "FileVersion", "0.0.4"
+            VALUE "FileVersion", "0.0.5"
             VALUE "InternalName", "piarch"
             VALUE "LegalCopyright", "BrainbirdLab"
             VALUE "OriginalFilename", "piarch"
             VALUE "ProductName", "piarch"
-            VALUE "ProductVersion", "0.0.4"
+            VALUE "ProductVersion", "0.0.5"
             VALUE "Author", "Fuad Hasan"
         }
     }

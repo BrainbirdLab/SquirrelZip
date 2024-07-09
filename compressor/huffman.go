@@ -1,18 +1,14 @@
 package compressor
 
-import (
-	"container/heap"
-)
-
 // Node represents a node in the Huffman tree
 type Node struct {
-	char  rune    // Character stored in the node
-	freq  int     // Frequency of the character
-	left  *Node   // Left child node
-	right *Node   // Right child node
+	char  rune           // Character stored in the node
+	freq  int            // Frequency of the character
+	left  *Node          // Left child node
+	right *Node          // Right child node
 }
 
-// PriorityQueue implements heap.Interface and holds Nodes
+// PriorityQueue implements a priority queue for Nodes
 type PriorityQueue []*Node
 
 // Len returns the number of items in the priority queue
@@ -29,12 +25,12 @@ func (pq PriorityQueue) Swap(i, j int) {
 }
 
 // Push adds an item (Node) to the priority queue
-func (pq *PriorityQueue) Push(x interface{}) {
-	*pq = append(*pq, x.(*Node))
+func (pq *PriorityQueue) Push(x *Node) {
+	*pq = append(*pq, x)
 }
 
 // Pop removes and returns the highest priority item (Node) from the priority queue
-func (pq *PriorityQueue) Pop() interface{} {
+func (pq *PriorityQueue) Pop() *Node {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
@@ -50,11 +46,11 @@ func buildHuffmanTree(freq map[rune]int) *Node {
 		pq[i] = &Node{char: char, freq: f}
 		i++
 	}
-	heap.Init(&pq)
+	buildMinHeap(pq)
 
 	for len(pq) > 1 {
-		left := heap.Pop(&pq).(*Node)
-		right := heap.Pop(&pq).(*Node)
+		left := pq.Pop()
+		right := pq.Pop()
 
 		internal := &Node{
 			char:  '\x00', // internal node character
@@ -62,13 +58,41 @@ func buildHuffmanTree(freq map[rune]int) *Node {
 			left:  left,
 			right: right,
 		}
-		heap.Push(&pq, internal)
+		pq.Push(internal)
 	}
 
 	if len(pq) > 0 {
-		return heap.Pop(&pq).(*Node) // root of Huffman tree
+		return pq.Pop() // root of Huffman tree
 	}
 	return nil
+}
+
+// buildMinHeap builds a min-heap for the priority queue
+func buildMinHeap(pq PriorityQueue) {
+	n := len(pq)
+	for i := n/2 - 1; i >= 0; i-- {
+		heapify(pq, n, i)
+	}
+}
+
+// heapify maintains the heap property of the priority queue
+func heapify(pq PriorityQueue, n, i int) {
+	smallest := i
+	left := 2*i + 1
+	right := 2*i + 2
+
+	if left < n && pq[left].freq < pq[smallest].freq {
+		smallest = left
+	}
+
+	if right < n && pq[right].freq < pq[smallest].freq {
+		smallest = right
+	}
+
+	if smallest != i {
+		pq.Swap(i, smallest)
+		heapify(pq, n, smallest)
+	}
 }
 
 // buildHuffmanCodes builds Huffman codes (bit strings) for each character
