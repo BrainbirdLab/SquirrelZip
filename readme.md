@@ -1,16 +1,16 @@
-# File compressor CLI-tool
+# PiArch File compressor CLI-tool
 
 Simple CLI-tool for compressing files using Huffman coding algorithm.
 
 ## Usage
 Build
 ```bash
-go build -o compress main.go
+./build
 ```
 
 Run
 ```bash
-./compress -i <file1,file2> -o <outputDir>
+./piarch -i <file1,file2> -o <outputDir>
 ```
 
 ```bash
