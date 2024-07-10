@@ -27,6 +27,4 @@ func main() {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
 		os.Exit(1)
 	}
-
-	utils.ColorPrint(utils.GREEN, "Done\n")
 }

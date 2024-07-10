@@ -37,53 +37,11 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 
 	// Channel to receive errors from goroutines
 	errChan := make(chan error, len(filenameStrs))
-
-	// Function to handle compression of a single file or directory
-	compressFileOrFolder := func(filePath string) error {
-		// Check if the file or folder exists
-		info, err := os.Stat(filePath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("file or folder does not exist: %s", filePath)
-		}
-
-		if info.IsDir() {
-			utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing folder (%s)\n", filePath))
-			err := compressFolderRecursive(filePath, &files, &originalSize)
-			if err != nil {
-				return err
-			}
-		} else {
-			utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing file (%s)\n", filePath))
-			// Read file content
-			content, err := os.ReadFile(filePath)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", filePath, err)
-			}
-
-			// Store file information (name and content)
-			files = append(files, utils.File{
-				Name:    path.Base(filePath),
-				Content: content,
-			})
-
-			// Increment original size
-			atomic.AddInt64(&originalSize, info.Size())
-		}
-		return nil
-	}
-
 	// Process each input file or folder recursively
 	for _, filename := range filenameStrs {
 		wg.Add(1)
 		file := filename
-		go func(filePath string) {
-			defer wg.Done()
-
-			err := compressFileOrFolder(filePath)
-			if err != nil {
-				errChan <- err
-			}
-		}(file)
+		go handleFileFolder(file, &files, &originalSize, &wg, errChan)
 	}
 
 	// Wait for all goroutines to finish
@@ -101,6 +59,7 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 
 	// Compress files using Huffman coding
 	compressedFile, err := Zip(files)
+
 	if err != nil {
 		return err
 	}
@@ -148,6 +107,41 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 		utils.FileSize(originalSize), utils.FileSize(compressedSize), compressionRatio*100))
 
 	return nil
+}
+
+func handleFileFolder(filePath string, files *[]utils.File, originalSize *int64, wg *sync.WaitGroup, errChan chan error) {
+	
+	defer wg.Done()
+
+	// Check if the file or folder exists
+	info, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		errChan <- fmt.Errorf("file or folder does not exist: %s", filePath)
+	}
+
+	if info.IsDir() {
+		utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing folder (%s)\n", filePath))
+		err := compressFolderRecursive(filePath, files, originalSize)
+		if err != nil {
+			errChan <- err
+		}
+	} else {
+		utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing file (%s)\n", filePath))
+		// Read file content
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to read file %s: %w", filePath, err)
+		}
+
+		// Store file information (name and content)
+		*files = append(*files, utils.File{
+			Name:    path.Base(filePath),
+			Content: content,
+		})
+
+		// Increment original size
+		atomic.AddInt64(originalSize, info.Size())
+	}
 }
 
 // Function to recursively compress a folder and its contents
@@ -275,6 +269,8 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 		}
 	}
 
+	utils.ColorPrint(utils.GREEN, "Decompression complete\n")
+
 	return nil
 }
 
@@ -283,11 +279,12 @@ func InvalidateFileName(file *utils.File, outputDir *string) {
 	//extract the file name without the extension
 	filename := path.Base(file.Name)
 	filename = strings.TrimSuffix(filename, fileExt)
+
 	count := 1
 	for {
-		if _, err := os.Stat(filepath.Join(*outputDir, filepath.Dir(file.Name), filename+fmt.Sprintf("_%d%s", count, fileExt))); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(*outputDir, filename + fmt.Sprintf("_%d%s", count, fileExt))); os.IsNotExist(err) {
 			utils.ColorPrint(utils.PURPLE, fmt.Sprintf("File %s already exists, renaming to %s\n", file.Name, filename+fmt.Sprintf("_%d%s", count, fileExt)))
-			file.Name = filepath.Dir(file.Name) + "/" + filename + fmt.Sprintf("_%d%s", count, fileExt)
+			file.Name = filename + fmt.Sprintf("_%d%s", count, fileExt)
 			break
 		}
 		count++

@@ -21,7 +21,7 @@ func ParseCLI() ([]string, *string, *string, *bool) {
 
 	if *version {
 		ColorPrint(WHITE, "---------- PI ARCHIVER ----------\n")
-		ColorPrint(YELLOW, "Version: v0.0.2\n")
+		ColorPrint(YELLOW, "Version: v1.0.0\n")
 		// dev info
 		ColorPrint(WHITE, "Developed by: https://github.com/itsfuad/\n")
 		ColorPrint(WHITE, "---------------------------------")
