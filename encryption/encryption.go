@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 )
+
 // Constants
 const (
 	MetadataLength = 1 // Length of the metadata
@@ -43,17 +44,17 @@ func Encrypt(data []byte, password string) ([]byte, error) {
 }
 
 // Decrypt function
-func Decrypt(data []byte, password string) ([]byte, error) {
-	if len(data) < MetadataLength {
+func Decrypt(data *[]byte, password string) ([]byte, error) {
+	if len(*data) < MetadataLength {
 		return nil, errors.New("invalid data")
 	}
 
-	metadata := data[0]
-	data = data[MetadataLength:]
+	metadata := (*data)[0]
+	*data = (*data)[MetadataLength:]
 
 	if metadata == 0 {
 		// No password was used
-		return data, nil
+		return *data, nil
 	}
 
 	if password == "" {
@@ -73,10 +74,10 @@ func Decrypt(data []byte, password string) ([]byte, error) {
 		return nil, err
 	}
 	nonceSize := gcm.NonceSize()
-	if len(data) < nonceSize {
+	if len(*data) < nonceSize {
 		return nil, errors.New("ciphertext too short")
 	}
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	nonce, ciphertext := (*data)[:nonceSize], (*data)[nonceSize:]
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {

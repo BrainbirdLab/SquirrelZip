@@ -5,7 +5,6 @@ package main
 import (
 	"file-compressor/compressor"
 	"file-compressor/utils"
-	"os"
 )
 
 
@@ -25,6 +24,5 @@ func main() {
 
 	if err != nil {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
-		os.Exit(1)
 	}
 }

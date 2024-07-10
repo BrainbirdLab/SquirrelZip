@@ -203,11 +203,9 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 	}
 
 	// Decrypt compressed content if password is provided
-	if password != nil && *password != "" {
-		compressedContent, err = encryption.Decrypt(compressedContent, *password)
-		if err != nil {
-			return fmt.Errorf("decryption error: %w", err)
-		}
+	compressedContent, err = encryption.Decrypt(&compressedContent, *password)
+	if err != nil {
+		return fmt.Errorf("decryption error: %w", err)
 	}
 
 	// Decompress file using Huffman coding
@@ -230,30 +228,7 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 	// Process each decompressed file
 	for _, file := range files {
 		wg.Add(1)
-		go func(file utils.File) {
-			defer wg.Done()
-
-			// Create directories if they don't exist
-			outputPath := filepath.Join(*outputDir, filepath.Dir(file.Name))
-			err := os.MkdirAll(outputPath, os.ModePerm)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to create directory %s: %w", outputPath, err)
-				return
-			}
-
-			// Check if the file already exists, rename it with file_N
-			if _, err := os.Stat(filepath.Join(*outputDir, file.Name)); err == nil {
-				InvalidateFileName(&file, outputDir)
-			}
-
-			// Write decompressed file content
-			err = os.WriteFile(filepath.Join(*outputDir, file.Name), file.Content, 0644)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to write decompressed file %s: %w", file.Name, err)
-				return
-			}
-			utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Decompressed file: %s\n", file.Name))
-		}(file)
+		go handleDecompression(file, outputDir, &wg, errChan)
 	}
 
 	// Wait for all goroutines to finish
@@ -272,6 +247,32 @@ func Decompress(filenameStrs []string, outputDir *string, password *string) erro
 	utils.ColorPrint(utils.GREEN, "Decompression complete\n")
 
 	return nil
+}
+
+func handleDecompression(file utils.File, outputDir *string, wg *sync.WaitGroup, errChan chan error) {
+
+	defer wg.Done()
+
+	// Create directories if they don't exist
+	outputPath := filepath.Join(*outputDir, filepath.Dir(file.Name))
+	err := os.MkdirAll(outputPath, os.ModePerm)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to create directory %s: %w", outputPath, err)
+		return
+	}
+
+	// Check if the file already exists, rename it with file_N
+	if _, err := os.Stat(filepath.Join(*outputDir, file.Name)); err == nil {
+		InvalidateFileName(&file, outputDir)
+	}
+
+	// Write decompressed file content
+	err = os.WriteFile(filepath.Join(*outputDir, file.Name), file.Content, 0644)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to write decompressed file %s: %w", file.Name, err)
+		return
+	}
+	utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Decompressed file: %s\n", file.Name))
 }
 
 func InvalidateFileName(file *utils.File, outputDir *string) {
