@@ -50,12 +50,12 @@ func Decrypt(data *[]byte, password string) ([]byte, error) {
 	}
 
 	metadata := (*data)[0]
-	*data = (*data)[MetadataLength:]
-
 	if metadata == 0 {
 		// No password was used
 		return *data, nil
 	}
+
+	*data = (*data)[MetadataLength:]
 
 	if password == "" {
 		return nil, errors.New("password is required")
