@@ -158,6 +158,7 @@ func compressFolderRecursive(folderPath string, files *[]utils.File, originalSiz
 			return err
 		}
 		if !info.IsDir() {
+			utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing file (%s)\n", filePath))
 			// Read file content
 			content, err := os.ReadFile(filePath)
 			if err != nil {
