@@ -10,12 +10,12 @@ func TestEncryptWithPassword(t *testing.T) {
 
 	output := input
 
-	err := Encrypt(&output, &password)
+	err := Encrypt(&output, password)
 	if err != nil {
 		t.Fatalf("failed to encrypt data with password: %v", err)
 	}
 
-	err = Decrypt(&output, &password)
+	err = Decrypt(&output, password)
 
 	if err != nil {
 		t.Fatalf("failed to decrypt data with password: %v", err)
@@ -32,12 +32,12 @@ func TestEncryptWithoutPassword(t *testing.T) {
 
 	output := input
 
-	err := Encrypt(&output, &password)
+	err := Encrypt(&output, password)
 	if err != nil {
 		t.Fatalf("failed to encrypt data without password: %v", err)
 	}
 
-	err = Decrypt(&output, &password)
+	err = Decrypt(&output, password)
 
 	if err != nil {
 		t.Fatalf("failed to decrypt data without password: %v", err)
@@ -55,7 +55,7 @@ func TestDecryptInvalidData(t *testing.T) {
 
 	output := input
 
-	err := Encrypt(&output, &password)
+	err := Encrypt(&output, password)
 	if err != nil {
 		t.Fatalf("failed to encrypt data with password: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestDecryptInvalidData(t *testing.T) {
 	// Modify the encrypted data
 	output[0] = 2
 
-	err = Decrypt(&output, &password)
+	err = Decrypt(&output, password)
 
 	if err == nil {
 		t.Fatalf("expected error but got nil")
@@ -76,14 +76,14 @@ func TestDecryptInvalidPassword(t *testing.T) {
 
 	output := input
 
-	err := Encrypt(&output, &password)
+	err := Encrypt(&output, password)
 	if err != nil {
 		t.Fatalf("failed to encrypt data with password: %v", err)
 	}
 
 	invalidPass := "invalid password"
 
-	err = Decrypt(&output, &invalidPass)
+	err = Decrypt(&output, invalidPass)
 
 	if err == nil {
 		t.Fatalf("expected error but got nil")
