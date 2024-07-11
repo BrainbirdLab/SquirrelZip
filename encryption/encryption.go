@@ -14,14 +14,14 @@ const (
 )
 
 // Encrypt function
-func Encrypt(data *[]byte, password *string) error {
+func Encrypt(data *[]byte, password string) error {
 	var metadata byte
 
-	if *password == "" {
+	if password == "" {
 		metadata = 0 // 0 indicates no password was used
 	} else {
 		metadata = 1 // 1 indicates a password was used
-		key, err := generateKey(*password)
+		key, err := generateKey(password)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func Encrypt(data *[]byte, password *string) error {
 }
 
 // Decrypt function
-func Decrypt(data *[]byte, password *string) error {
+func Decrypt(data *[]byte, password string) error {
 
 	if len(*data) < MetadataLength {
 		return fmt.Errorf("invalid data")
@@ -58,11 +58,11 @@ func Decrypt(data *[]byte, password *string) error {
 		return fmt.Errorf("invalid metadata")
 	}
 
-	if *password == "" {
+	if password == "" {
 		return fmt.Errorf("password is required")
 	}
 
-	key, err := generateKey(*password)
+	key, err := generateKey(password)
 	if err != nil {
 		return err
 	}

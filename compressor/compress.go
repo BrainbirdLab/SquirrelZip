@@ -14,10 +14,10 @@ import (
 )
 
 // Compress compresses the specified files or folders into a single compressed file.
-func Compress(filenameStrs []string, outputDir *string, password *string) error {
+func Compress(filenameStrs []string, outputDir string, password string) error {
 	// Set default output directory if not provided
-	if *outputDir == "" {
-		*outputDir = path.Dir(filenameStrs[0])
+	if outputDir == "" {
+		outputDir = path.Dir(filenameStrs[0])
 	}
 
 	// Prepare to store files' content
@@ -45,19 +45,19 @@ func Compress(filenameStrs []string, outputDir *string, password *string) error 
 	}
 
 	// Check if the output directory exists; create if not
-	if _, err := os.Stat(*outputDir); os.IsNotExist(err) {
-		err := os.MkdirAll(*outputDir, os.ModePerm)
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		err := os.MkdirAll(outputDir, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 	}
 
 	// Check if the output file already exists; rename if necessary
-	if _, err := os.Stat(*outputDir + "/" + compressedFile.Name); err == nil {
-		InvalidateFileName(&compressedFile, outputDir)
+	if _, err := os.Stat(outputDir + "/" + compressedFile.Name); err == nil {
+		InvalidateFileName(&compressedFile, &outputDir)
 	}
 
-	output := *outputDir + "/" + compressedFile.Name
+	output := outputDir + "/" + compressedFile.Name
 
 	// Write compressed file to the output directory
 	err = os.WriteFile(output, compressedFile.Content, 0644)
@@ -141,11 +141,11 @@ func readFileFromDisk(filePath string, files *[]utils.File, originalSize *int64,
 }
 
 // Decompress decompresses the specified compressed file into individual files or folders.
-func Decompress(compressedFilename string, outputDir *string, password *string) error {
+func Decompress(compressedFilename string, outputDir string, password string) error {
 
 	// Set default output directory if not provided
-	if *outputDir == "" {
-		*outputDir = path.Dir(compressedFilename)
+	if outputDir == "" {
+		outputDir = path.Dir(compressedFilename)
 	}
 
 	compressedContent := make([]byte, 0)
@@ -186,7 +186,7 @@ func Decompress(compressedFilename string, outputDir *string, password *string) 
 	return nil
 }
 
-func writeAllFilesToDiskConcurrently(files []utils.File, outputDir *string) error {
+func writeAllFilesToDiskConcurrently(files []utils.File, outputDir string) error {
 
 	// Use a wait group to synchronize goroutines
 	var wg sync.WaitGroup
@@ -217,12 +217,12 @@ func writeAllFilesToDiskConcurrently(files []utils.File, outputDir *string) erro
 	return nil
 }
 
-func writeFileToDisk(file utils.File, outputDir *string, wg *sync.WaitGroup, errChan chan error) {
+func writeFileToDisk(file utils.File, outputDir string, wg *sync.WaitGroup, errChan chan error) {
 
 	defer wg.Done()
 
 	// Create directories if they don't exist
-	outputPath := filepath.Join(*outputDir, filepath.Dir(file.Name))
+	outputPath := filepath.Join(outputDir, filepath.Dir(file.Name))
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to create directory %s: %w", outputPath, err)
@@ -230,12 +230,12 @@ func writeFileToDisk(file utils.File, outputDir *string, wg *sync.WaitGroup, err
 	}
 
 	// Check if the file already exists, rename it with file_N
-	if _, err := os.Stat(filepath.Join(*outputDir, file.Name)); err == nil {
-		InvalidateFileName(&file, outputDir)
+	if _, err := os.Stat(filepath.Join(outputDir, file.Name)); err == nil {
+		InvalidateFileName(&file, &outputDir)
 	}
 
 	// Write decompressed file content
-	err = os.WriteFile(filepath.Join(*outputDir, file.Name), file.Content, 0644)
+	err = os.WriteFile(filepath.Join(outputDir, file.Name), file.Content, 0644)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to write decompressed file %s: %w", file.Name, err)
 		return

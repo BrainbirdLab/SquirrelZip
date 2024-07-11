@@ -20,13 +20,13 @@ func TestIO(t *testing.T) {
 		t.Fatalf("failed to read test files from %s: %v", inputDir, err)
 	}
 	//compress test files
-	err = compressor.Compress(inputFilesNames, &zipOutputDir, &testPassword)
+	err = compressor.Compress(inputFilesNames, zipOutputDir, testPassword)
 	if err != nil {
 		t.Fatalf("failed to compress test files: %v", err)
 	}
 
 	//decompress test files
-	err = compressor.Decompress(zipOutputDir + "/" + "compressed.bin", &unzipOutputDir, &testPassword)
+	err = compressor.Decompress(zipOutputDir + "/" + "compressed.bin", unzipOutputDir, testPassword)
 	if err != nil {
 		t.Fatalf("failed to decompress test files: %v", err)
 	}
