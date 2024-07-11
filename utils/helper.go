@@ -12,6 +12,7 @@ type File struct {
 type COLOR string
 
 const (
+	GREY  COLOR = "\033[1;30m%s\033[0m"
 	RED    COLOR = "\033[1;31m%s\033[0m"
 	GREEN  COLOR = "\033[1;32m%s\033[0m"
 	YELLOW COLOR = "\033[1;33m%s\033[0m"
@@ -35,6 +36,6 @@ func FileSize(sizeBytes int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %ciB",
+	return fmt.Sprintf("%.1f %cB",
 		float64(sizeBytes)/float64(div), "KMGTPE"[exp])
 }

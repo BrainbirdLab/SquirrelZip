@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"container/heap"
 	"encoding/binary"
-	"errors"
 	"file-compressor/utils"
+	"fmt"
 )
 
 // Node represents a node in the Huffman tree
 type Node struct {
-	char  rune    // Character stored in the node
-	freq  int     // Frequency of the character
-	left  *Node   // Left child node
-	right *Node   // Right child node
+	char  rune  // Character stored in the node
+	freq  int   // Frequency of the character
+	left  *Node // Left child node
+	right *Node // Right child node
 }
 
 // PriorityQueue implements heap.Interface and holds Nodes
@@ -49,7 +49,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 // buildHuffmanTree builds the Huffman tree from character frequencies
 func buildHuffmanTree(freq map[rune]int) (*Node, error) {
 	if len(freq) == 0 {
-		return nil, errors.New("frequency map is empty")
+		return nil, fmt.Errorf("frequency map is empty")
 	}
 
 	pq := make(PriorityQueue, len(freq))
@@ -76,13 +76,13 @@ func buildHuffmanTree(freq map[rune]int) (*Node, error) {
 	if len(pq) > 0 {
 		return heap.Pop(&pq).(*Node), nil // root of Huffman tree
 	}
-	return nil, errors.New("failed to build Huffman tree")
+	return nil, fmt.Errorf("failed to build Huffman tree")
 }
 
 // buildHuffmanCodes builds Huffman codes (bit strings) for each character
 func buildHuffmanCodes(root *Node) (map[rune]string, error) {
 	if root == nil {
-		return nil, errors.New("cannot build codes from nil root")
+		return nil, fmt.Errorf("cannot build codes from nil root")
 	}
 
 	codes := make(map[rune]string)
@@ -220,7 +220,6 @@ func Zip(files []utils.File) (utils.File, error) {
 // Unzip decompresses a compressed file using Huffman coding and returns individual files.
 func Unzip(file utils.File) ([]utils.File, error) {
 	var files []utils.File
-
 	// Read file content
 	buf := bytes.NewBuffer(file.Content)
 
@@ -228,6 +227,7 @@ func Unzip(file utils.File) ([]utils.File, error) {
 	var numFiles uint32
 	err := binary.Read(buf, binary.BigEndian, &numFiles)
 	if err != nil {
+		fmt.Printf("Error reading number of files: %v\n", err)
 		return nil, err
 	}
 

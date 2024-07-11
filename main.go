@@ -12,12 +12,12 @@ func main() {
 	//test files path '/test'
 
 	//cli arguments
-	filenameStrs, outputDir, password, decompressMode := utils.ParseCLI()
+	filenameStrs, outputDir, password, mode := utils.ParseCLI()
 
 	var err error
 
-	if *decompressMode {
-		err = compressor.Decompress(filenameStrs, outputDir, password)
+	if mode == utils.DECOMPRESS {
+		err = compressor.Decompress(filenameStrs[0], outputDir, password)
 	} else {
 		err = compressor.Compress(filenameStrs, outputDir, password)
 	}
