@@ -5,8 +5,8 @@ package main
 import (
 	"file-compressor/compressor"
 	"file-compressor/utils"
+
 	"time"
-	"fmt"
 )
 
 
@@ -30,7 +30,6 @@ func main() {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
 	} else {
 		endTime := time.Now()
-		tookTime := endTime.Sub(startTime).Microseconds()
-		utils.ColorPrint(utils.GREEN, fmt.Sprintf("Took %d ms\n", tookTime))
+		utils.ColorPrint(utils.GREEN, "Time taken: " + utils.TimeTrack(startTime, endTime) + "\n")
 	}
 }

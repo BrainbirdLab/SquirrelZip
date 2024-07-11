@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"time"
 )
 
 type File struct {
@@ -38,4 +39,30 @@ func FileSize(sizeBytes int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB",
 		float64(sizeBytes)/float64(div), "KMGTPE"[exp])
+}
+
+func TimeTrack(startTime, endTime time.Time) string {
+	elapsedTime := endTime.Sub(startTime)
+	//return nanoseconds, microseconds, milliseconds, seconds, minutes, hours
+	if elapsedTime < 1000 {
+		return fmt.Sprintf("%d ns", elapsedTime)
+	}
+
+	if elapsedTime < 1000000 {
+		return fmt.Sprintf("%d µs", elapsedTime/1000)
+	}
+
+	if elapsedTime < 1000000000 {
+		return fmt.Sprintf("%d ms", elapsedTime/1000000)
+	}
+
+	if elapsedTime < 60000000000 {
+		return fmt.Sprintf("%d s", elapsedTime/1000000000)
+	}
+
+	if elapsedTime < 3600000000000 {
+		return fmt.Sprintf("%d m", elapsedTime/60000000000)
+	}
+
+	return fmt.Sprintf("%d h", elapsedTime/3600000000000)
 }
