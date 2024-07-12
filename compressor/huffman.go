@@ -103,29 +103,34 @@ func buildHuffmanCodes(root *Node) (map[rune]string, error) {
 }
 
 // rebuildHuffmanTree reconstructs the Huffman tree from Huffman codes
-func rebuildHuffmanTree(codes map[rune]string) (*Node, error) {
-	var root *Node
+func rebuildHuffmanTree(root *Node, codes map[rune]string) error {
 	for char, code := range codes {
-		if root == nil {
-			root = &Node{}
-		}
-		current := root
-		for _, bit := range code {
-			if bit == '0' {
-				if current.left == nil {
-					current.left = &Node{}
-				}
-				current = current.left
-			} else if bit == '1' {
-				if current.right == nil {
-					current.right = &Node{}
-				}
-				current = current.right
-			}
-		}
-		current.char = char
+		insertNode(root, char, code)
 	}
-	return root, nil
+	return nil
+}
+
+// insertNode inserts a node into the Huffman tree based on the given code
+func insertNode(root *Node, char rune, code string) {
+	if root == nil {
+		root = &Node{}
+	}
+
+	current := root
+	for _, bit := range code {
+		if bit == '0' {
+			if current.left == nil {
+				current.left = &Node{}
+			}
+			current = current.left
+		} else if bit == '1' {
+			if current.right == nil {
+				current.right = &Node{}
+			}
+			current = current.right
+		}
+	}
+	current.char = char
 }
 
 // Zip compresses files using Huffman coding and returns a compressed file object.
@@ -140,28 +145,9 @@ func Zip(files []utils.File) (utils.File, error) {
 
 	// Create raw content buffer
 	var rawContent bytes.Buffer
-	for _, file := range files {
-		// Write filename length and filename
-		filenameLen := uint32(len(file.Name))
-		err := binary.Write(&rawContent, binary.BigEndian, filenameLen)
-		if err != nil {
-			return utils.File{}, err
-		}
-		_, err = rawContent.WriteString(file.Name)
-		if err != nil {
-			return utils.File{}, err
-		}
-
-		// Write content length and content
-		contentLen := uint32(len(file.Content))
-		err = binary.Write(&rawContent, binary.BigEndian, contentLen)
-		if err != nil {
-			return utils.File{}, err
-		}
-		_, err = rawContent.Write(file.Content)
-		if err != nil {
-			return utils.File{}, err
-		}
+	err = createContentBuffer(files, &rawContent)
+	if err != nil {
+		return utils.File{}, err
 	}
 
 	// Compress rawContent using Huffman coding
@@ -177,7 +163,10 @@ func Zip(files []utils.File) (utils.File, error) {
 	if err != nil {
 		return utils.File{}, err
 	}
-	compressedContent := compressData(rawContent.Bytes(), codes)
+	compressedContent, err := compressData(rawContent.Bytes(), codes)
+	if err != nil {
+		return utils.File{}, err
+	}
 
 	// Write compressed content length to buffer
 	err = binary.Write(&buf, binary.BigEndian, uint32(len(compressedContent)))
@@ -196,25 +185,60 @@ func Zip(files []utils.File) (utils.File, error) {
 		return utils.File{}, err
 	}
 	// Write Huffman codes to buffer
-	for char, code := range codes {
-		err = binary.Write(&buf, binary.BigEndian, char)
-		if err != nil {
-			return utils.File{}, err
-		}
-		err = binary.Write(&buf, binary.BigEndian, uint32(len(code)))
-		if err != nil {
-			return utils.File{}, err
-		}
-		_, err = buf.WriteString(code)
-		if err != nil {
-			return utils.File{}, err
-		}
+	err = writeHuffmanCodesToBuffer(codes, &buf)
+	if err != nil {
+		return utils.File{}, err
 	}
 
 	return utils.File{
 		Name:    "compressed.bin",
 		Content: buf.Bytes(),
 	}, nil
+}
+
+func writeHuffmanCodesToBuffer(codes map[rune]string, buf *bytes.Buffer) error {
+	for char, code := range codes {
+		err := binary.Write(buf, binary.BigEndian, char)
+		if err != nil {
+			return err
+		}
+		err = binary.Write(buf, binary.BigEndian, uint32(len(code)))
+		if err != nil {
+			return err
+		}
+		_, err = buf.WriteString(code)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createContentBuffer(files []utils.File, rawContent *bytes.Buffer) error {
+	for _, file := range files {
+		// Write filename length and filename
+		filenameLen := uint32(len(file.Name))
+		err := binary.Write(rawContent, binary.BigEndian, filenameLen)
+		if err != nil {
+			return err
+		}
+		_, err = rawContent.WriteString(file.Name)
+		if err != nil {
+			return err
+		}
+
+		// Write content length and content
+		contentLen := uint32(len(file.Content))
+		err = binary.Write(rawContent, binary.BigEndian, contentLen)
+		if err != nil {
+			return err
+		}
+		_, err = rawContent.Write(file.Content)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Unzip decompresses a compressed file using Huffman coding and returns individual files.
@@ -250,110 +274,134 @@ func Unzip(file utils.File) ([]utils.File, error) {
 		return nil, err
 	}
 
-	// Read Huffman codes
 	codes := make(map[rune]string)
-	for i := uint32(0); i < codesLength; i++ {
-		var char rune
-		err = binary.Read(buf, binary.BigEndian, &char)
-		if err != nil {
-			return nil, err
-		}
-		var codeLength uint32
-		err = binary.Read(buf, binary.BigEndian, &codeLength)
-		if err != nil {
-			return nil, err
-		}
-		code := make([]byte, codeLength)
-		_, err = buf.Read(code)
-		if err != nil {
-			return nil, err
-		}
-		codes[char] = string(code)
-	}
+	// Read Huffman codes
+	readHuffManCodes(&codes, buf, codesLength)
 
 	// Rebuild Huffman tree using codes
-	var root *Node
+	var root Node
 	if len(codes) > 0 {
-		root, err = rebuildHuffmanTree(codes)
+		err = rebuildHuffmanTree(&root, codes)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	decompressedContent := decompressData(compressedContent, root)
+	decompressedContent := decompressData(compressedContent, &root)
 
 	// Parse decompressed content to extract files
 	decompressedContentBuf := bytes.NewBuffer(decompressedContent)
-	for f := uint32(0); f < numFiles; f++ {
-		// Read filename length
-		var nameLength uint32
-		err = binary.Read(decompressedContentBuf, binary.BigEndian, &nameLength)
-		if err != nil {
-			return nil, err
-		}
-		// Read filename
-		name := make([]byte, nameLength)
-		_, err = decompressedContentBuf.Read(name)
-		if err != nil {
-			return nil, err
-		}
-		// Read content length
-		var contentLength uint32
-		err = binary.Read(decompressedContentBuf, binary.BigEndian, &contentLength)
-		if err != nil {
-			return nil, err
-		}
-		// Read content
-		content := make([]byte, contentLength)
-		_, err = decompressedContentBuf.Read(content)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, utils.File{
-			Name:    string(name),
-			Content: content,
-		})
+	err = parseDecompressedContent(&files, &numFiles, decompressedContentBuf)
+
+	if err != nil {
+		return nil, err
 	}
 
 	return files, nil
 }
 
+func parseDecompressedContent(files *[]utils.File, numFiles *uint32, decompressedContentBuf *bytes.Buffer) error {
+	for f := uint32(0); f < *numFiles; f++ {
+		// Read filename length
+		var nameLength uint32
+		err := binary.Read(decompressedContentBuf, binary.BigEndian, &nameLength)
+		if err != nil {
+			return err
+		}
+		// Read filename
+		name := make([]byte, nameLength)
+		_, err = decompressedContentBuf.Read(name)
+		if err != nil {
+			return err
+		}
+		// Read content length
+		var contentLength uint32
+		err = binary.Read(decompressedContentBuf, binary.BigEndian, &contentLength)
+		if err != nil {
+			return err
+		}
+		// Read content
+		content := make([]byte, contentLength)
+		_, err = decompressedContentBuf.Read(content)
+		if err != nil {
+			return err
+		}
+		*files = append(*files, utils.File{
+			Name:    string(name),
+			Content: content,
+		})
+	}
+	return nil
+}
+
+func readHuffManCodes(codes *map[rune]string, buf *bytes.Buffer, codesLength uint32) error {
+	for i := uint32(0); i < codesLength; i++ {
+		var char rune
+		err := binary.Read(buf, binary.BigEndian, &char)
+		if err != nil {
+			return err
+		}
+		var codeLength uint32
+		err = binary.Read(buf, binary.BigEndian, &codeLength)
+		if err != nil {
+			return err
+		}
+		code := make([]byte, codeLength)
+		_, err = buf.Read(code)
+		if err != nil {
+			return err
+		}
+		(*codes)[char] = string(code)
+	}
+	return nil
+}
+
 // compressData compresses data using Huffman codes.
-func compressData(data []byte, codes map[rune]string) []byte {
+func compressData(data []byte, codes map[rune]string) ([]byte, error) {
 	var buf bytes.Buffer
 	var bitBuffer uint64
 	var bitLength uint
 	for _, b := range data {
 		code := codes[rune(b)]
-		for _, bit := range code {
-			bitBuffer <<= 1
-			bitLength++
-			if bit == '1' {
-				bitBuffer |= 1
-			}
-			if bitLength == 64 {
-				err := binary.Write(&buf, binary.BigEndian, bitBuffer)
-				if err != nil {
-					return nil
-				}
-				bitBuffer = 0
-				bitLength = 0
-			}
+		err := compressBits(&code, &buf, &bitBuffer, &bitLength)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if bitLength > 0 {
 		bitBuffer <<= (64 - bitLength)
 		err := binary.Write(&buf, binary.BigEndian, bitBuffer)
 		if err != nil {
-			return nil
+			return nil, fmt.Errorf("failed to write bit buffer: %v", err)
 		}
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
+}
+
+func compressBits(code *string, buf *bytes.Buffer, bitBuffer *uint64, bitLength *uint) error {
+	for _, bit := range *code {
+		*bitBuffer <<= 1
+		*bitLength++
+		if bit == '1' {
+			*bitBuffer |= 1
+		}
+		if *bitLength == 64 {
+			err := binary.Write(buf, binary.BigEndian, bitBuffer)
+			if err != nil {
+				return fmt.Errorf("failed to write bit buffer: %v", err)
+			}
+			*bitBuffer = 0
+			*bitLength = 0
+		}
+	}
+	return nil
 }
 
 // decompressData decompresses data using Huffman codes.
 func decompressData(data []byte, root *Node) []byte {
+
 	var buf bytes.Buffer
+
 	if root == nil {
 		return buf.Bytes()
 	}

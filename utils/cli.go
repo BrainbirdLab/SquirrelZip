@@ -17,8 +17,7 @@ const (
 	DECOMPRESS MODE = "decompress"
 )
 
-func ParseCLI() ([]string, *string, *string, MODE) {
-	// CLI arguments
+func initFlags() (*bool, *string, *string, *string, *bool, *string) {
 	version := flag.Bool("v", false, "Print version")
 	inputToCompress := flag.String("c", "", "Input files or directory to be compressed")
 	outputDir := flag.String("o", "", "Output directory to compressed/decompress files (Optional)")
@@ -35,6 +34,57 @@ func ParseCLI() ([]string, *string, *string, MODE) {
 			ColorPrint(GREY, fmt.Sprintf("%s\n", f.Usage))
 		})
 	}
+
+	//return all flags
+	return version, inputToCompress, outputDir, password, readAllFiles, inputToDecompress
+}
+
+func setupCompressMode(Mode *MODE, readAllFiles *bool, inputToCompress *string, filenameStrs *[]string) {
+	// compress mode
+	*Mode = COMPRESS
+	// Handle reading all files in the input directory
+	if *readAllFiles {
+		var err error
+
+		*filenameStrs, err = GetAllFileNamesFromDir(inputToCompress)
+
+		if err != nil {
+			ColorPrint(RED, err.Error()+"\n")
+			os.Exit(1)
+		}
+	} else {
+		// Split input files by comma and trim spaces and quotes (if any)
+		for _, filename := range strings.Split(*inputToCompress, ",") {
+			*filenameStrs = append(*filenameStrs, strings.Trim(filename, " '\""))
+		}
+	}
+}
+
+func setupDecompressMode(Mode *MODE, inputToDecompress *string, filenameStrs *[]string, readAllFiles *bool) {
+	// decompress mode
+	*Mode = DECOMPRESS
+
+	//cannot contain all files lookup -a flag
+	if *readAllFiles {
+		ColorPrint(RED, "All files lookup not supported for decompression\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	//cannot contain comma
+	if strings.Contains(*inputToDecompress, ",") {
+		ColorPrint(RED, "Cannot decompress multiple files at once\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	*filenameStrs = append(*filenameStrs, *inputToDecompress)
+}
+
+func ParseCLI() ([]string, *string, *string, MODE) {
+	// CLI arguments
+
+	version, inputToCompress, outputDir, password, readAllFiles, inputToDecompress := initFlags()
 
 	if *version {
 		ColorPrint(WHITE, "---------- PI ARCHIVER ----------\n")
@@ -56,51 +106,23 @@ func ParseCLI() ([]string, *string, *string, MODE) {
 	var Mode MODE
 
 	if *inputToCompress != "" {
-		// compress mode
-		Mode = COMPRESS
-		// Handle reading all files in the input directory
-		if *readAllFiles {
-			var err error
-			filenameStrs, err = GetAllFileNamesFromDir(inputToCompress)
-
-			if err != nil {
-				ColorPrint(RED, err.Error()+"\n")
-				os.Exit(1)
-			}
-		} else {
-			// Split input files by comma and trim spaces and quotes (if any)
-			for _, filename := range strings.Split(*inputToCompress, ",") {
-				filenameStrs = append(filenameStrs, strings.Trim(filename, " '\""))
-			}
-		}
+		setupCompressMode(&Mode, readAllFiles, inputToCompress, &filenameStrs)
+	} else if *inputToCompress == "" && *inputToDecompress == "" {
+		ColorPrint(RED, "No input files provided\n")
+		flag.Usage()
+		os.Exit(1)
 	} else if *inputToDecompress != "" {
-		// decompress mode
-		Mode = DECOMPRESS
-
-		//cannot contain all files lookup -a flag
-		if *readAllFiles {
-			ColorPrint(RED, "All files lookup not supported for decompression\n")
-			flag.Usage()
-			os.Exit(1)
-		}
-
-		//cannot contain comma
-		if strings.Contains(*inputToDecompress, ",") {
-			ColorPrint(RED, "Cannot decompress multiple files at once\n")
-			flag.Usage()
-			os.Exit(1)
-		}
-
-		filenameStrs = append(filenameStrs, *inputToDecompress)
-
+		setupDecompressMode(&Mode, inputToDecompress, &filenameStrs, readAllFiles)
 	} else {
-		ColorPrint(RED, "No input provided\n")
+		ColorPrint(RED, "No flags provided\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	return filenameStrs, outputDir, password, Mode
 }
+
+
 
 func GetAllFileNamesFromDir(dir *string) ([]string, error) {
 
