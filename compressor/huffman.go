@@ -191,7 +191,7 @@ func Zip(files []utils.File) (utils.File, error) {
 	}
 
 	return utils.File{
-		Name:    "compressed.bin",
+		Name:    "compressed.arc",
 		Content: buf.Bytes(),
 	}, nil
 }

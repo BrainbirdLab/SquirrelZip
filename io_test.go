@@ -26,7 +26,7 @@ func TestIO(t *testing.T) {
 	}
 
 	//decompress test files
-	err = compressor.Decompress(zipOutputDir + "/" + "compressed.bin", unzipOutputDir, testPassword)
+	err = compressor.Decompress(zipOutputDir + "/" + "compressed.arc", unzipOutputDir, testPassword)
 	if err != nil {
 		t.Fatalf("failed to decompress test files: %v", err)
 	}
