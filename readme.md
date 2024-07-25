@@ -1,4 +1,4 @@
-# PiArch File compressor CLI-tool
+# Chipmunk File compressor/archiver CLI-tool
 
 Simple CLI-tool for compressing files using Huffman coding algorithm.
 
@@ -10,7 +10,7 @@ Build
 
 Run
 ```bash
-./piarch -i <file1,file2> -o <outputDir>
+./chippi -i <file1,file2> -o <outputDir>
 ```
 
 ```bash

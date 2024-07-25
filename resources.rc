@@ -1,10 +1,10 @@
 // resources.rc
 
-IDI_ICON1 ICON "icon.ico"
+IDI_ICON1 ICON "_icon.ico"
 
 1 VERSIONINFO
-FILEVERSION 1,0,5
-PRODUCTVERSION 1,0,5
+FILEVERSION 1,0,6
+PRODUCTVERSION 1,0,6
 FILEOS 0x4
 FILETYPE 0x1
 {
@@ -14,12 +14,12 @@ FILETYPE 0x1
         {
             VALUE "CompanyName", "BrainbirdLab"
             VALUE "FileDescription", "File Compress-Encryption program"
-            VALUE "FileVersion", "1.0.5"
-            VALUE "InternalName", "piarch"
+            VALUE "FileVersion", "1.0.6"
+            VALUE "InternalName", "Chippmunk file archiver"
             VALUE "LegalCopyright", "BrainbirdLab"
-            VALUE "OriginalFilename", "piarch"
-            VALUE "ProductName", "piarch"
-            VALUE "ProductVersion", "1.0.5"
+            VALUE "OriginalFilename", "Chippmunk file archiver"
+            VALUE "ProductName", "Chippmunk file archiver"
+            VALUE "ProductVersion", "1.0.6"
             VALUE "Author", "Fuad Hasan"
         }
     }

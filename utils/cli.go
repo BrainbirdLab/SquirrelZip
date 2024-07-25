@@ -26,7 +26,7 @@ func initFlags() (*bool, *string, *string, *string, *bool, *string) {
 	inputToDecompress := flag.String("d", "", "Input file to decompress")
 	flag.Parse()
 	flag.Usage = func() {
-		ColorPrint(WHITE, "Usage: piarchiver [options]\n\n")
+		ColorPrint(WHITE, "Usage: Chipmunk file archiver [options]\n\n")
 		ColorPrint(WHITE, "Options:\n")
 		//print all flags in ColorPrint
 		flag.VisitAll(func(f *flag.Flag) {

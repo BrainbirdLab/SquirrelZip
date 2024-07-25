@@ -1,5 +1,3 @@
-// go: generate goversioninfo -icon = icon_piarchiver.ico
-
 package main
 
 import (
