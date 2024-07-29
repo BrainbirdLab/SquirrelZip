@@ -1,4 +1,4 @@
-# SquirrleZip File compressor/archiver CLI-tool
+# SquirrelZip File compressor/archiver CLI-tool
 
 Simple CLI-tool for compressing files using Huffman coding algorithm.
 

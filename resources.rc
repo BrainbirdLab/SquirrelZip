@@ -15,10 +15,10 @@ FILETYPE 0x1
             VALUE "CompanyName", "BrainbirdLab"
             VALUE "FileDescription", "File Compress-Encryption program"
             VALUE "FileVersion", "1.0.6"
-            VALUE "InternalName", "SquirrleZip file archiver"
+            VALUE "InternalName", "SquirrelZip file archiver"
             VALUE "LegalCopyright", "BrainbirdLab"
-            VALUE "OriginalFilename", "SquirrleZip file archiver"
-            VALUE "ProductName", "SquirrleZip file archiver"
+            VALUE "OriginalFilename", "SquirrelZip file archiver"
+            VALUE "ProductName", "SquirrelZip file archiver"
             VALUE "ProductVersion", "1.0.6"
             VALUE "Author", "Fuad Hasan"
         }
