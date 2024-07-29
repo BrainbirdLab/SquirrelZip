@@ -1,4 +1,4 @@
-# Chipmunk File compressor/archiver CLI-tool
+# SquirrleZip File compressor/archiver CLI-tool
 
 Simple CLI-tool for compressing files using Huffman coding algorithm.
 
@@ -10,7 +10,7 @@ Build
 
 Run
 ```bash
-./chippi -i <file1,file2> -o <outputDir>
+./sq -i <file1,file2> -o <outputDir>
 ```
 
 ```bash
