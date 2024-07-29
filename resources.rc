@@ -3,8 +3,8 @@
 IDI_ICON1 ICON "_icon.ico"
 
 1 VERSIONINFO
-FILEVERSION 1,0,6
-PRODUCTVERSION 1,0,6
+FILEVERSION 1,0,7
+PRODUCTVERSION 1,0,7
 FILEOS 0x4
 FILETYPE 0x1
 {
@@ -14,12 +14,12 @@ FILETYPE 0x1
         {
             VALUE "CompanyName", "BrainbirdLab"
             VALUE "FileDescription", "File Compress-Encryption program"
-            VALUE "FileVersion", "1.0.6"
+            VALUE "FileVersion", "1.0.7"
             VALUE "InternalName", "SquirrelZip file archiver"
             VALUE "LegalCopyright", "BrainbirdLab"
             VALUE "OriginalFilename", "SquirrelZip file archiver"
             VALUE "ProductName", "SquirrelZip file archiver"
-            VALUE "ProductVersion", "1.0.6"
+            VALUE "ProductVersion", "1.0.7"
             VALUE "Author", "Fuad Hasan"
         }
     }
