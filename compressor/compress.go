@@ -3,7 +3,6 @@ package compressor
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -17,7 +16,7 @@ import (
 func Compress(filenameStrs []string, outputDir string, password string) error {
 	// Set default output directory if not provided
 	if outputDir == "" {
-		outputDir = path.Dir(filenameStrs[0])
+		outputDir = filepath.Dir(filenameStrs[0])
 	}
 
 	// Prepare to store files' content
@@ -26,9 +25,14 @@ func Compress(filenameStrs []string, outputDir string, password string) error {
 	var compressedSize int64
 
 	// Read all files concurrently
-	err := ReadAllFilesConcurrently(filenameStrs, &files, &originalSize)
-	if err != nil {
-		return err
+	errs := ReadAllFilesConcurrently(filenameStrs, &files, &originalSize)
+
+	// Check for errors from goroutines
+	if len(errs) > 0 {
+		for _, err := range errs {
+			utils.ColorPrint(utils.RED, fmt.Sprintf("Error: %v\n", err))
+		}
+		os.Exit(1)
 	}
 
 	// Compress files using Huffman coding
@@ -83,7 +87,7 @@ func Compress(filenameStrs []string, outputDir string, password string) error {
 	return nil
 }
 
-func ReadAllFilesConcurrently(filenameStrs []string, files *[]utils.File, originalSize *int64) error {
+func ReadAllFilesConcurrently(filenameStrs []string, files *[]utils.File, originalSize *int64) []error {
 	// Use a wait group to synchronize goroutines
 	var wg sync.WaitGroup
 	var errMutex sync.Mutex // Mutex to handle errors safely
@@ -101,16 +105,19 @@ func ReadAllFilesConcurrently(filenameStrs []string, files *[]utils.File, origin
 	wg.Wait()
 	close(errChan)
 
+	errors := make([]error, 0)
+
 	// Check for errors from goroutines
 	for err := range errChan {
 		if err != nil {
+			//print all errors
 			errMutex.Lock()
-			defer errMutex.Unlock()
-			return err // Return the first error encountered
+			errors = append(errors, err)
+			errMutex.Unlock()
 		}
 	}
 
-	return nil
+	return errors
 }
 
 func readFileFromDisk(filePath string, files *[]utils.File, originalSize *int64, wg *sync.WaitGroup, errChan chan error) {
@@ -120,19 +127,21 @@ func readFileFromDisk(filePath string, files *[]utils.File, originalSize *int64,
 	// Check if the file or folder exists
 	info, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		errChan <- fmt.Errorf("file or folder does not exist: %s", filePath)
+		errChan <- fmt.Errorf("file or folder does not exist: '%s'", filePath)
+		return
 	}
 
 	utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Compressing file (%s)\n", filePath))
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		errChan <- fmt.Errorf("failed to read file %s: %w", filePath, err)
+		errChan <- fmt.Errorf("failed to read file '%s': %w", filePath, err)
+		return
 	}
 
 	// Store file information (name and content)
 	*files = append(*files, utils.File{
-		Name:    path.Base(filePath),
+		Name:    filepath.Base(filePath),
 		Content: content,
 	})
 
@@ -145,7 +154,7 @@ func Decompress(compressedFilename string, outputDir string, password string) er
 
 	// Set default output directory if not provided
 	if outputDir == "" {
-		outputDir = path.Dir(compressedFilename)
+		outputDir = filepath.Dir(compressedFilename)
 	}
 
 	compressedContent := make([]byte, 0)
@@ -166,7 +175,7 @@ func Decompress(compressedFilename string, outputDir string, password string) er
 
 	// Decompress file using Huffman coding
 	files, err := Unzip(utils.File{
-		Name:    path.Base(compressedFilename),
+		Name:    filepath.Base(compressedFilename),
 		Content: compressedContent,
 	})
 
@@ -244,9 +253,9 @@ func writeFileToDisk(file utils.File, outputDir string, wg *sync.WaitGroup, errC
 }
 
 func InvalidateFileName(file *utils.File, outputDir *string) {
-	fileExt := path.Ext(file.Name)
+	fileExt := filepath.Ext(file.Name)
 	//extract the file name without the extension
-	filename := path.Base(file.Name)
+	filename := filepath.Base(file.Name)
 	filename = strings.TrimSuffix(filename, fileExt)
 
 	count := 1

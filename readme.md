@@ -15,8 +15,8 @@ Run
 
 ```txt
   -a    Read all files in the provided directory
-  -d    File paths to decompress
-  -c    File paths to compress
+  -d    File path to decompress (Only one file at once)
+  -c    File paths to compress (Space separated file paths)
   -o string
         Output directory for compressed files (Optional)
   -p string
@@ -27,11 +27,11 @@ Run
 ### Compress
 #### Compress without password:
 ```txt
-./sq -c file.txt,file2.txt
+./sq -c file.txt file2.txt
 ```
 #### Compress with password:
 ```txt
-./sq -c file.txt,file2.txt -p mySecurepass1234
+./sq -c file.txt file2.txt -p mySecurepass1234
 ```
 #### Or compress the whole directory:
 ```txt

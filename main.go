@@ -3,9 +3,10 @@ package main
 import (
 	"file-compressor/compressor"
 	"file-compressor/utils"
-
+	
 	"time"
 )
+
 
 
 func main() {
