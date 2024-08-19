@@ -10,17 +10,18 @@ import (
 
 // Constants
 const (
-	MetadataLength = 1 // Length of the metadata
+	MetadataLength = 9 // Length of the metadata
 )
 
 // Encrypt function
 func Encrypt(data *[]byte, password string) error {
-	var metadata byte
+
+	var metadata []byte
 
 	if password == "" {
-		metadata = 0 // 0 indicates no password was used
+		metadata = append(metadata, 0)
 	} else {
-		metadata = 1 // 1 indicates a password was used
+		metadata = append(metadata, 1)
 		key, err := generateKey(password)
 		if err != nil {
 			return err
@@ -39,7 +40,9 @@ func Encrypt(data *[]byte, password string) error {
 		}
 		*data = gcm.Seal(nonce, nonce, *data, nil)
 	}
-	*data = append([]byte{metadata}, *data...)
+
+	*data = append(metadata, *data...)
+
 	return nil
 }
 
@@ -50,40 +53,51 @@ func Decrypt(data *[]byte, password string) error {
 		return fmt.Errorf("invalid data")
 	}
 
-	metadata := (*data)[0]
-	*data = (*data)[MetadataLength:]
-	if metadata == 0 {
-		return nil
-	} else if metadata != 1 {
+	var hasPassword bool
+
+	switch (*data)[0] {
+	case 0:
+		hasPassword = false
+	case 1:
+		hasPassword = true
+	default:
 		return fmt.Errorf("invalid metadata")
 	}
 
-	if password == "" {
-		return fmt.Errorf("password is required")
-	}
+	*data = (*data)[1:]
 
-	key, err := generateKey(password)
-	if err != nil {
-		return err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return err
-	}
-	nonceSize := gcm.NonceSize()
-	if len(*data) < nonceSize {
-		return fmt.Errorf("ciphertext too short")
-	}
-	nonce, ciphertext := (*data)[:nonceSize], (*data)[nonceSize:]
+	if hasPassword {
+		if password == "" {
+			return fmt.Errorf("password is required")
+		}
 
-	*data, err = gcm.Open(nil, nonce, ciphertext, nil)
+		key, err := generateKey(password)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return fmt.Errorf("incorrect password")
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return err
+		}
+
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			return err
+		}
+
+		nonceSize := gcm.NonceSize()
+		if len(*data) < nonceSize {
+			return fmt.Errorf("ciphertext too short")
+		}
+
+		nonce, ciphertext := (*data)[:nonceSize], (*data)[nonceSize:]
+
+		*data, err = gcm.Open(nil, nonce, ciphertext, nil)
+
+		if err != nil {
+			return fmt.Errorf("incorrect password")
+		}
 	}
 
 	return nil

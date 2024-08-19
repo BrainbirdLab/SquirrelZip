@@ -10,6 +10,21 @@ type File struct {
 	Content []byte
 }
 
+type Algorithm string
+
+const (
+	HUFFMAN Algorithm = "huffman"
+	ARITHMETIC Algorithm = "arithmetic"
+
+	UNSUPPORTED Algorithm = "unsupported"
+)
+
+const (
+	FailedToCompress string = "failed to compress data: %v"
+	FailedToDecompress string = "failed to decompress data: %v"
+	MissMatch string = "decompressed data does not match original data: %v != %v"
+)
+
 type COLOR string
 
 const (
@@ -65,4 +80,26 @@ func TimeTrack(startTime, endTime time.Time) string {
 	}
 
 	return fmt.Sprintf("%d h", elapsedTime/3600000000000)
+}
+
+type FilesRatio struct {
+	inital int
+	compressed int
+}
+
+func NewFilesRatio(initial, compressed int) FilesRatio {
+	return FilesRatio{
+		inital: 0,
+		compressed: 0,
+	}
+}
+
+func (f FilesRatio) PrintFileInfo() {
+	fmt.Printf("Target size: %d\n", f.inital)
+	fmt.Printf("Compressed size: %d\n", f.compressed)
+}
+
+func (f FilesRatio) PrintCompressionRatio() {
+	compressionRatio := float64(f.inital) / float64(f.compressed) * 100
+	fmt.Printf("Compression ratio: %.2f%%\n", compressionRatio)
 }

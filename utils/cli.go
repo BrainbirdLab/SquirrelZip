@@ -122,8 +122,9 @@ func initFlags() (map[string]interface{}, error) {
 	flagSet.Bool("v", "Print version")
 	flagSet.ArrayStr("c", "Input files or directory to be compressed")
 	flagSet.String("o", "Output directory to compressed/decompress files (Optional)")
+	flagSet.String("a", "Algorithm to use for compression (Optional)")
 	flagSet.String("p", "Password for encryption (Optional)")
-	flagSet.Bool("a", "Read all files in the input directory")
+	flagSet.Bool("all", "Read all files in the input directory (Optional)")
 	flagSet.ArrayStr("d", "Input file to decompress")
 	flagSet.Bool("h", "Print help")
 
@@ -175,7 +176,7 @@ func setupDecompressMode(Mode *MODE, inputToDecompress []string, filenameStrs *[
 	*filenameStrs = append(*filenameStrs, inputToDecompress[0])
 }
 
-func ParseCLI() ([]string, *string, *string, MODE) {
+func ParseCLI() ([]string, *string, *string, MODE, string) {
 	// CLI arguments
 
 	values, err := initFlags()
@@ -191,12 +192,14 @@ func ParseCLI() ([]string, *string, *string, MODE) {
 	inputToCompress, _ := values["c"].([]string)
 	outputDir, _ := values["o"].(string)
 	password, _ := values["p"].(string)
-	readAllFiles, _ := values["a"].(bool)
+	readAllFiles, _ := values["all"].(bool)
 	inputToDecompress, _ := values["d"].([]string)
+	algorithm, _ := values["a"].(string)
+
 
 	if version {
 		ColorPrint(WHITE, "---------- SquirrelZip ----------\n")
-		ColorPrint(YELLOW, "Version: v1.0.8\n")
+		ColorPrint(YELLOW, "Version: v1.0.10\n")
 		// dev info
 		ColorPrint(WHITE, "Developed by: https://github.com/itsfuad/\n")
 		ColorPrint(WHITE, "---------------------------------")
@@ -232,7 +235,7 @@ func ParseCLI() ([]string, *string, *string, MODE) {
 		os.Exit(1)
 	}
 
-	return filenameStrs, &outputDir, &password, Mode
+	return filenameStrs, &outputDir, &password, Mode, algorithm
 }
 
 

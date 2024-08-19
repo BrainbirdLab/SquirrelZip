@@ -10,10 +10,59 @@ import (
 
 	"file-compressor/encryption"
 	"file-compressor/utils"
+	ar "file-compressor/compressor/arithmetic"
+	hc "file-compressor/compressor/huffmanCoding"
 )
 
+func WriteCompressionAlgorithm(algo string, file *utils.File) {
+
+	data := file.Content
+
+	algoNameLen := len(algo)
+
+	rawData := make([]byte, algoNameLen+1+len(data))
+
+	rawData[0] = byte(algoNameLen)
+
+	copy(rawData[1:], []byte(algo))
+
+	copy(rawData[1+algoNameLen:], data)
+
+	file.Content = rawData
+}
+
+func CheckCompressionAlgorithm(algo string) error {
+	switch utils.Algorithm(algo) {
+	case utils.HUFFMAN, utils.ARITHMETIC:
+		return nil
+	default:
+		return fmt.Errorf("unsupported compression algorithm: %v", algo)
+	}
+}
+
+func ReadCompressionAlgorithm(file *utils.File) (utils.Algorithm, error) {
+	
+	if len(file.Content) == 0 {
+		return utils.UNSUPPORTED, fmt.Errorf("empty file content")
+	}
+
+	// Read algorithm name length
+	algoNameLen := int(file.Content[0])
+
+	// Read algorithm name
+	algoName := string(file.Content[1 : 1+algoNameLen])
+
+	// Read compressed content
+	compressedContent := file.Content[1+algoNameLen:]
+
+	// Update file content
+	file.Content = compressedContent
+
+	return utils.Algorithm(algoName), nil
+}
+
 // Compress compresses the specified files or folders into a single compressed file.
-func Compress(filenameStrs []string, outputDir string, password string) error {
+func Compress(filenameStrs []string, outputDir string, password string, algorithm string) error {
 	// Set default output directory if not provided
 	if outputDir == "" {
 		outputDir = filepath.Dir(filenameStrs[0])
@@ -35,13 +84,31 @@ func Compress(filenameStrs []string, outputDir string, password string) error {
 		os.Exit(1)
 	}
 
-	// Compress files using Huffman coding
-	compressedFile, err := Zip(files)
+
+	// Check if the compression algorithm is supported
+	err := CheckCompressionAlgorithm(algorithm)
+	if err != nil {
+		return err
+	}
+
+	var compressedFile utils.File
+
+	switch utils.Algorithm(algorithm) {
+	case utils.HUFFMAN:
+		// Compress files using Huffman coding
+		compressedFile, err = hc.Zip(files)
+	case utils.ARITHMETIC:
+		// Compress files using Arithmetic coding
+		compressedFile, err = ar.Zip(files)
+	}
 
 	if err != nil {
 		return err
 	}
 
+	// Write compression algorithm to compressed file
+	WriteCompressionAlgorithm(algorithm, &compressedFile)
+	
 	// Encrypt compressed content if password is provided, else just compress
 	err = encryption.Encrypt(&compressedFile.Content, password)
 	if err != nil {
@@ -173,17 +240,30 @@ func Decompress(compressedFilename string, outputDir string, password string) er
 		return fmt.Errorf("decryption error: %w", err)
 	}
 
-	// Decompress file using Huffman coding
-	files, err := Unzip(utils.File{
+	file := utils.File{
 		Name:    filepath.Base(compressedFilename),
 		Content: compressedContent,
-	})
+	}
+
+	// Read compression algorithm
+	algorithm, err := ReadCompressionAlgorithm(&file)
+	if err != nil {
+		return fmt.Errorf("failed to read compression algorithm: %w", err)
+	}
+
+	var files []utils.File
+
+	switch algorithm {
+	case utils.HUFFMAN:
+		files, err = hc.Unzip(file)
+	case utils.ARITHMETIC:
+		files, err = ar.Unzip(file)
+	}
 
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return err
 	}
-
 	// Write decompressed files to disk
 	err = writeAllFilesToDiskConcurrently(files, outputDir)
 	if err != nil {

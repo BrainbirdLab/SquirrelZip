@@ -1,17 +1,26 @@
 package main
 
 import (
-	"file-compressor/compressor"
-	"file-compressor/utils"
 	"os"
 	"testing"
+
+	"file-compressor/compressor"
+	"file-compressor/utils"
 )
 
 func TestIO(t *testing.T) {
-	t.Log("TestIO")
+	Init(t, "huffman")
+	Init(t, "arithmetic")
+}
+
+func Init(t *testing.T, algo string) {
+
+	t.Log("TestIO: Testing IO operations with algorithm: ", algo)
 	inputDir := "test_files"
 	zipOutputDir := "test_zip"
 	unzipOutputDir := "test_unzip"
+
+	clean(zipOutputDir, unzipOutputDir)
 
 	testPassword := ""
 
@@ -20,7 +29,7 @@ func TestIO(t *testing.T) {
 		t.Fatalf("failed to read test files from %s: %v", inputDir, err)
 	}
 	//compress test files
-	err = compressor.Compress(inputFilesNames, zipOutputDir, testPassword)
+	err = compressor.Compress(inputFilesNames, zipOutputDir, testPassword, algo)
 	if err != nil {
 		t.Fatalf("failed to compress test files: %v", err)
 	}
@@ -31,7 +40,14 @@ func TestIO(t *testing.T) {
 		t.Fatalf("failed to decompress test files: %v", err)
 	}
 
-	//clean up
+	defer func ()  {		
+		//clean up
+		t.Log("Cleanup")
+		clean(zipOutputDir, unzipOutputDir)
+	}()
+}
+
+func clean(zipOutputDir, unzipOutputDir string) {
 	os.RemoveAll(zipOutputDir)
 	os.RemoveAll(unzipOutputDir)
 }
