@@ -2,21 +2,15 @@ package utils
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-type File struct {
-	Name    string
-	Content []byte
-}
-
 type FileData struct {
-	Reader io.Reader
 	Name   string
+	Size   int64
 }
 
 type Algorithm string

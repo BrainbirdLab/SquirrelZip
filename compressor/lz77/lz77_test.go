@@ -17,7 +17,7 @@ func TestLZ(t *testing.T) {
 		t.Fatalf(utils.FailedToCompress, err)
 	}
 	
-	fileRatio := utils.NewFilesRatio(len(targetData), len(compressedData))
+	fileRatio := utils.NewFilesRatio(int64(len(targetData)), int64(len(compressedData)))
 
 	fileRatio.PrintFileInfo()
 
@@ -75,7 +75,7 @@ func RunFile(targetPath string, t *testing.T) {
 		t.Fatalf(utils.FailedToCompress, err)
 	}
 
-	fileRatio := utils.NewFilesRatio(len(targetData), len(compressedData))
+	fileRatio := utils.NewFilesRatio(int64(len(targetData)), int64(len(compressedData)))
 
 	fileRatio.PrintFileInfo()
 
