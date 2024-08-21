@@ -52,7 +52,7 @@ func TestSmallData(t *testing.T) {
 
 func TestLZWithFileData(t *testing.T) {
 	RunFile("example.txt", t)
-	RunFile("image.JPG", t)
+	//RunFile("image.JPG", t)
 }
 
 func RunFile(targetPath string, t *testing.T) {

@@ -2,12 +2,21 @@ package utils
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 type File struct {
 	Name    string
 	Content []byte
+}
+
+type FileData struct {
+	Reader io.Reader
+	Name   string
 }
 
 type Algorithm string
@@ -83,23 +92,41 @@ func TimeTrack(startTime, endTime time.Time) string {
 }
 
 type FilesRatio struct {
-	inital int
-	compressed int
+	inital int64
+	compressed int64
 }
 
-func NewFilesRatio(initial, compressed int) FilesRatio {
+func NewFilesRatio(initial, compressed int64) FilesRatio {
 	return FilesRatio{
-		inital: 0,
-		compressed: 0,
+		inital: initial,
+		compressed: compressed,
 	}
 }
 
-func (f FilesRatio) PrintFileInfo() {
-	fmt.Printf("Target size: %d\n", f.inital)
-	fmt.Printf("Compressed size: %d\n", f.compressed)
+func (f *FilesRatio) PrintFileInfo() {
+	fmt.Printf("Target size: %s\n", FileSize(f.inital))
+	fmt.Printf("Compressed size: %s\n", FileSize(f.compressed))
 }
 
-func (f FilesRatio) PrintCompressionRatio() {
-	compressionRatio := float64(f.inital) / float64(f.compressed) * 100
+func (f *FilesRatio) PrintCompressionRatio() {
+	compressionRatio := (float64(f.compressed) / float64(f.inital))  * 100
 	fmt.Printf("Compression ratio: %.2f%%\n", compressionRatio)
+}
+
+func InvalidateFileName(filename string, outputDir string) string {
+	fileExt := filepath.Ext(filename)
+	//extract the file name without the extension
+	filename = filepath.Base(filename)
+	filename = strings.TrimSuffix(filename, fileExt)
+
+	count := 1
+	for {
+		if _, err := os.Stat(filepath.Join(outputDir, filename+fmt.Sprintf("_%d%s", count, fileExt))); os.IsNotExist(err) {
+			ColorPrint(PURPLE, fmt.Sprintf("File %s already exists, renaming to %s\n", filename, filename+fmt.Sprintf("_%d%s", count, fileExt)))
+			filename = filename + fmt.Sprintf("_%d%s", count, fileExt)
+			break
+		}
+		count++
+	}
+	return filename
 }

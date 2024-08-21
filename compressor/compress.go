@@ -331,20 +331,3 @@ func writeFileToDisk(file utils.File, outputDir string, wg *sync.WaitGroup, errC
 	}
 	utils.ColorPrint(utils.YELLOW, fmt.Sprintf("Decompressed file: %s\n", file.Name))
 }
-
-func InvalidateFileName(file *utils.File, outputDir *string) {
-	fileExt := filepath.Ext(file.Name)
-	//extract the file name without the extension
-	filename := filepath.Base(file.Name)
-	filename = strings.TrimSuffix(filename, fileExt)
-
-	count := 1
-	for {
-		if _, err := os.Stat(filepath.Join(*outputDir, filename+fmt.Sprintf("_%d%s", count, fileExt))); os.IsNotExist(err) {
-			utils.ColorPrint(utils.PURPLE, fmt.Sprintf("File %s already exists, renaming to %s\n", file.Name, filename+fmt.Sprintf("_%d%s", count, fileExt)))
-			file.Name = filename + fmt.Sprintf("_%d%s", count, fileExt)
-			break
-		}
-		count++
-	}
-}

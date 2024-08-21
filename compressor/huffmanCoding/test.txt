@@ -1,0 +1,1 @@
+Hello, World! Hello are you doing today? I am doing great! How about you? This is a test message to test the huffman coding algorithm. I hope it works well.

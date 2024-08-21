@@ -9,7 +9,7 @@ import (
 const (
 	windowSize = 4096  // Larger sliding window
 	maxMatch   = 258   // Maximum match length
-	minMatch   = 3     // Minimum match length
+	minMatch   = 2     // Minimum match length
 )
 
 type LZ77Compressor struct {
