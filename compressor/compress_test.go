@@ -28,8 +28,12 @@ func Init(algo string, t *testing.T) {
 	}
 
 	outputDir := "output"
-	err = Compress(fileNameStrs, outputDir, "", algo, "test_files")
+	outputPath, size, err := Compress(fileNameStrs, outputDir, "", algo)
 	if err != nil {
 		t.Fatalf("failed to compress files: %v", err)
 	}
+	fmt.Printf("Compressed file: %s\nSize: %d\n", outputPath, size)
+
+	// Decompress
+	decompressedPath, err := Decompress(outputPath, outputDir, algo)
 }

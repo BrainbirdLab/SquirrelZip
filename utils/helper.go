@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"io"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 type FileData struct {
 	Name   string
 	Size   int64
+	Reader io.Reader
 }
 
 type Algorithm string
