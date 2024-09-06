@@ -11,6 +11,10 @@ import (
 	"os"
 )
 
+const (
+	BUFFER_SIZE = 32
+)
+
 // Node represents a node in the Huffman tree.
 type Node struct {
 	char  rune  // Character stored in the node
@@ -338,53 +342,93 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 	return nil
 }
 
-func decompressData(input io.Reader, output io.Writer, codes map[rune]string) error {
+func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string) error {
 
-	buf := make([]byte, 256)
-	numOfBits := int8(0)
-	lastByte := byte(0)
-	remainingBits := byte(0)
-	remainingBitsLen := int8(0)
+	lastByte := make([]byte, 1)
+	lastByteCount := make([]byte, 1)
 
+	leftOverByte := byte(0)
+	leftOverByteCount := uint8(0)
+
+	loopFlag := 0
 	root := rebuildHuffmanTree(codes)
+	currentNode := root
 
 	for {
-		buffLen, err := input.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
 
-		eof := make([]byte, 1)
-		n, err := input.Read(eof)
+		readBuffer := make([]byte, BUFFER_SIZE)
+		n, err := reader.Read(readBuffer)
 		if err != nil && err != io.EOF {
 			return err
 		}
 
 		if n == 0 {
-			numOfBits = int8(buf[buffLen-1])
-			//remove the last byte from the buffer
-			buf = buf[:buffLen-1]
-			buffLen-- // decrement the buffer length
-			lastByte = buf[buffLen-1]
-			buf = buf[:buffLen-1]
-			buffLen--
+
+			err := compressRemainingBits(leftOverByte, int8(leftOverByteCount), int8(lastByteCount[0]), lastByte[0], writer, root)
+			if err != nil {
+				return fmt.Errorf("error compressing remaining bits: %w", err)
+			}
+
+			break
 		} else {
-			fmt.Printf("adding eof byte to the buffer\n")
-			//add the eof byte to the buffer
-			buf = append(buf, eof...)
+
+			adjustBuffer(loopFlag, &n, &lastByte, &lastByteCount, &readBuffer)
+			
+			if err := compressFullByte(readBuffer, &leftOverByte, &leftOverByteCount, &currentNode, &root, writer); err != nil {
+				return fmt.Errorf("error compressing full byte: %w", err)
+			}
+
+			fmt.Printf("Chunk: [%s] of length: %d written.\n", readBuffer, len(readBuffer))
 		}
 
-		// compress the solid bytes (8 bits)
-		if err := compressFullBits(buffLen, buf, output, root, &remainingBits, &remainingBitsLen); err != nil {
-			return fmt.Errorf("error compressing full bits: %w", err)
-		}
+		loopFlag = 1
+	}
 
-		// compress the remaining bits (incomplete bytes which are not multiples of 8)
-		if n == 0 {
-			return compressRemainingBits(remainingBits, remainingBitsLen, numOfBits, lastByte, output, root)
+	return nil
+}
+
+func adjustBuffer(loopFlag int, n *int, lastByte *[]byte, lastByteCount *[]byte, readBuffer *[]byte) {
+	if loopFlag != 0 {
+		*n += 2
+		//add the last byte and bit count to the readBuffer
+		leftOverData := append(*lastByte, *lastByteCount...)
+		*readBuffer = append(leftOverData, *readBuffer...)
+	}
+
+	// add the last byte from the chunk to the lastByte buffer
+	*lastByte = (*readBuffer)[*n-2:*n-1]
+	// add the last byte's bit count to the lastByteCount buffer
+	*lastByteCount = (*readBuffer)[*n-1:*n]
+	// remove last 2 bytes from the chunk
+	*readBuffer = (*readBuffer)[:*n-2]
+}
+
+func compressFullByte(readBuffer []byte, leftOverByte *byte, leftOverByteCount *uint8, currentNode **Node, root **Node, writer io.Writer) error {
+	for _, b := range readBuffer {
+		for i := 7; i >= 0; i-- {
+			bit := (b >> i) & 1
+			*leftOverByte <<= 1
+			*leftOverByte |= bit
+			*leftOverByteCount++
+			if bit == 0 {
+				*currentNode = (*currentNode).left
+			} else {
+				*currentNode = (*currentNode).right
+			}
+			if (*currentNode).left == nil && (*currentNode).right == nil {
+				if _, err := writer.Write([]byte{byte((*currentNode).char)}); err != nil {
+					return fmt.Errorf("error writing decompressed data: %w", err)
+				}
+				*currentNode = *root
+				*leftOverByte = 0
+				*leftOverByteCount = 0
+			}
 		}
 	}
+
+	return nil
 }
+
 
 func compressRemainingBits(remainingBits byte, remainingBitsLen int8, numOfBits int8, lastByte byte, output io.Writer, root *Node) error {
 	// include the last byte in the remaining bits
@@ -417,34 +461,6 @@ func compressRemainingBits(remainingBits byte, remainingBitsLen int8, numOfBits 
 	return nil
 }
 
-func compressFullBits(buffLen int, buf []byte, output io.Writer, root *Node, remainingBits *byte, remainingBitsLen *int8) error {
-	currentNode := root
-	// compress the solid bytes (8 bits)
-	for i := 0; i < buffLen; i++ {
-		for j := 7; j >= 0; j-- {
-			bit := (buf[i] >> j) & 1
-			*remainingBits = ((*remainingBits) << 1) | bit
-			*remainingBitsLen++
-			if bit == 0 {
-				currentNode = currentNode.left
-			} else {
-				currentNode = currentNode.right
-			}
-
-			if currentNode.left == nil && currentNode.right == nil {
-				if _, err := output.Write([]byte{byte(currentNode.char)}); err != nil {
-					return fmt.Errorf("error writing decompressed data: %w", err)
-				}
-				currentNode = root
-				// clear the remaining bits
-				*remainingBits = 0
-				*remainingBitsLen = 0
-			}
-		}
-	}
-
-	return nil
-}
 
 // Zip compresses data using Huffman coding and writes the compressed data to the output stream.
 func Zip(files []utils.FileData, output io.Writer) error {
