@@ -6,7 +6,7 @@ import (
 	"file-compressor/utils"
 )
 
-func ParseDecompressedContent(files *[]utils.File, numFiles *uint32, decompressedContentBuf *bytes.Buffer) error {
+func ParseDecompressedContent(files *[]utils.FileData, numFiles *uint32, decompressedContentBuf *bytes.Buffer) error {
 	for f := uint32(0); f < *numFiles; f++ {
 		// Read filename length
 		var nameLength uint32
@@ -32,7 +32,7 @@ func ParseDecompressedContent(files *[]utils.File, numFiles *uint32, decompresse
 		if err != nil {
 			return err
 		}
-		*files = append(*files, utils.File{
+		*files = append(*files, utils.FileData{
 			Name:    string(name),
 			Content: content,
 		})
@@ -40,7 +40,7 @@ func ParseDecompressedContent(files *[]utils.File, numFiles *uint32, decompresse
 	return nil
 }
 
-func CreateContentBuffer(files []utils.File, rawContent *bytes.Buffer) error {
+func CreateContentBuffer(files []utils.FileData, rawContent *bytes.Buffer) error {
 	for _, file := range files {
 		// Write filename length and filename
 		filenameLen := uint32(len(file.Name))

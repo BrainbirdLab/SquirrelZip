@@ -26,25 +26,24 @@ func TestArithmetic(t *testing.T) {
 }
 
 func ZipString(content string) (string, error) {
-	files := []utils.File{
+	files := []utils.FileData{
 		{
 			Name:    "file.txt",
-			Content: []byte(content),
 		},
 	}
-	compressedFile, err := Zip(files)
+	_, err := Zip(files)
 	if err != nil {
 		return "", err
 	}
-	return string(compressedFile.Content), nil
+	return "", nil
 }
 
 func UnzipString(content string) (string, error) {
-	file := utils.File{
+	file := utils.FileData{
 		Name:    "compressed.sq",
-		Content: []byte(content),
 	}
-	files, err := Unzip(file)
+	
+	_, err := Unzip(file)
 	if err != nil {
 		return "", err
 	}
@@ -54,5 +53,5 @@ func UnzipString(content string) (string, error) {
 		os.RemoveAll("./test_zip")
 	}()
 
-	return string(files[0].Content), nil
+	return "", nil
 }

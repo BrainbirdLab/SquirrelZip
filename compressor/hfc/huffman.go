@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 )
 
 const (
-	BUFFER_SIZE = 32
+	BUFFER_SIZE = 256
 )
 
 // Node represents a node in the Huffman tree.
@@ -73,40 +74,32 @@ func buildHuffmanTree(freq *map[rune]int) (*Node, error) {
 	return heap.Pop(&pq).(*Node), nil
 }
 
-func BuildHuffmanCodes(freq *map[rune]int) (map[rune]string, int8, error) {
+func BuildHuffmanCodes(freq *map[rune]int) (map[rune]string, error) {
 
 	codes := make(map[rune]string)
-
-	totalBits := int64(0)
-	totalBytes := int8(0)
 
 	node, err := buildHuffmanTree(freq)
 	if err != nil {
 		fmt.Printf("Error building Huffman tree: %v\n", err)
-		return nil, 0, err
+		return nil, err
 	}
 
-	huffmanBuilder(node, "", &codes, freq, &totalBits)
+	huffmanBuilder(node, "", &codes, freq)
 
-	// Calculate the total number of bytes required to store the compressed data
-	totalBytes = int8(totalBits / 8)
-
-	return codes, totalBytes, nil
+	return codes, nil
 }
 
 // huffmanBuilder builds Huffman codes for each character.
-func huffmanBuilder(node *Node, prefix string, codes *map[rune]string, frequency *map[rune]int, totalBits *int64) {
+func huffmanBuilder(node *Node, prefix string, codes *map[rune]string, frequency *map[rune]int) {
 	if node == nil {
 		return
 	}
 	if node.left == nil && node.right == nil {
 		(*codes)[node.char] = prefix
-		// Calculate the number of bits used by this character
-		*totalBits += int64(len(prefix) * (*frequency)[node.char])
 		return
 	}
-	huffmanBuilder(node.left, prefix+"0", codes, frequency, totalBits)
-	huffmanBuilder(node.right, prefix+"1", codes, frequency, totalBits)
+	huffmanBuilder(node.left, prefix+"0", codes, frequency)
+	huffmanBuilder(node.right, prefix+"1", codes, frequency)
 }
 
 func rebuildHuffmanTree(codes map[rune]string) *Node {
@@ -152,13 +145,13 @@ func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
 	return nil
 }
 
-func writeHuffmanCodes(codes map[rune]string, output io.Writer) error {
+func writeHuffmanCodes(codes *map[rune]string, output io.Writer) error {
 	// Write the number of codes
-	if err := binary.Write(output, binary.LittleEndian, int32(len(codes))); err != nil {
+	if err := binary.Write(output, binary.LittleEndian, int32(len(*codes))); err != nil {
 		return fmt.Errorf("error writing number of codes: %w", err)
 	}
 
-	for char, code := range codes {
+	for char, code := range *codes {
 		if err := writeCodeEntry(char, code, output); err != nil {
 			return fmt.Errorf("error writing code entry: %w", err)
 		}
@@ -292,13 +285,11 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) erro
 	}
 	if bitCount > 0 {
 		// Pad the last byte with zeros
-		fmt.Printf("Padding last byte with %d zeros\n", 8-bitCount)
 		currentByte <<= 8 - bitCount
 		if _, err := output.Write([]byte{currentByte}); err != nil {
 			return fmt.Errorf("error writing compressed data: %w", err)
 		}
 	} else {
-		fmt.Printf("No padding required\n")
 		//write 8 
 		if _, err := output.Write([]byte{byte(8)}); err != nil {
 			return fmt.Errorf("error writing number of bits: %w", err)
@@ -377,8 +368,6 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string) e
 			if err := compressFullByte(readBuffer, &leftOverByte, &leftOverByteCount, &currentNode, &root, writer); err != nil {
 				return fmt.Errorf("error compressing full byte: %w", err)
 			}
-
-			fmt.Printf("Chunk: [%s] of length: %d written.\n", readBuffer, len(readBuffer))
 		}
 
 		loopFlag = 1
@@ -468,39 +457,8 @@ func Zip(files []utils.FileData, output io.Writer) error {
 	freq := make(map[rune]int)
 	codes := make(map[rune]string)
 
-	//first, we need to get the frequency map
-	for _, file := range files {
-
-		reader := file.Reader
-		//Get frequency map of the input file name
-		for _, char := range file.Name {
-			freq[char]++
-		}
-
-		//Get frequency map of the input data
-		if err := getFrequencyMap(reader, &freq); err != nil {
-			return fmt.Errorf("error generating frequency map: %w", err)
-		}
-		fmt.Printf("Frequency map length: %d\n", len(freq))
-
-		//Build Huffman tree and codes
-		root, err := buildHuffmanTree(&freq)
-		if err != nil {
-			return fmt.Errorf("error building Huffman tree: %w", err)
-		}
-
-		fmt.Println("Huffman tree built successfully")
-
-		totalBits := int64(0)
-
-		huffmanBuilder(root, "", &codes, &freq, &totalBits)
-
-		fmt.Printf("codes length: %d\n", len(codes))
-
-		// Write frequency map and Huffman codes to the output
-		if err := writeHuffmanCodes(codes, output); err != nil {
-			return fmt.Errorf("error writing Huffman codes: %w", err)
-		}
+	if err := prepareCodes(&files, &freq, &codes, output); err != nil {
+		return fmt.Errorf("error preparing codes: %w", err)
 	}
 
 	fmt.Printf("Huffman codes written successfully\n")
@@ -523,6 +481,49 @@ func Zip(files []utils.FileData, output io.Writer) error {
 	}
 
 	fmt.Printf("Data compressed successfully\n")
+
+	return nil
+}
+
+func prepareCodes(files *[]utils.FileData, freq *map[rune]int, codes *map[rune]string, output io.Writer) error {
+	//first, we need to get the frequency map
+	for _, file := range *files {
+
+		reader := file.Reader
+		//Get frequency map of the input file name
+		for _, char := range file.Name {
+			(*freq)[char]++
+		}
+
+		//Get frequency map of the input data
+		if err := getFrequencyMap(reader, freq); err != nil {
+			return fmt.Errorf("error generating frequency map: %w", err)
+		}
+
+		fmt.Printf("Frequency map length: %d\n", len(*freq))
+
+		//Build Huffman tree and codes
+		root, err := buildHuffmanTree(freq)
+		if err != nil {
+			return fmt.Errorf("error building Huffman tree: %w", err)
+		}
+
+		fmt.Println("Huffman tree built successfully")
+		
+		huffmanBuilder(root, "", codes, freq)
+		
+		fmt.Printf("codes length: %d\n", len(*codes))
+		
+		// Write frequency map and Huffman codes to the output
+		if err := writeHuffmanCodes(codes, output); err != nil {
+			return fmt.Errorf("error writing Huffman codes: %w", err)
+		}
+
+		//reset the seek
+		if _, err := reader.(io.Seeker).Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -611,6 +612,10 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 // Unzip decompresses data using Huffman coding and writes the decompressed data to the output stream.
 func Unzip(input io.Reader, outputPath string) ([]string, error) {
 
+	if outputPath == "" {
+		outputPath = "." // Use the current directory if no output path is provided
+	}
+
 	codes := make(map[rune]string)
 	if err := readHuffmanCodes(input, codes); err != nil {
 		return nil, fmt.Errorf("error reading Huffman codes: %w", err)
@@ -631,7 +636,7 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 			return nil, fmt.Errorf("error reading file name: %w", err)
 		}
 
-		fileName = outputPath + fileName
+		fileName = path.Join(outputPath, fileName)
 
 		// if output dir doesn't exist, create it
 		if _, err := os.Stat(fileName); os.IsNotExist(err) {

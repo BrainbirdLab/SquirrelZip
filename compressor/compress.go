@@ -137,7 +137,7 @@ func WriteAndDecompressFiles(inputFileName string, outputDir string) ([]string, 
 		errs = append(errs, fmt.Errorf("failed to decompress file: %v", err))
 	}
 
-	return fileNames, nil
+	return fileNames, errs[0]
 }
 
 // Decompress decompresses the specified compressed file.

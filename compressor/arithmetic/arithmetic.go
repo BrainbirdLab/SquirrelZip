@@ -66,18 +66,18 @@ func encodeBinary(code float64, numBits int) []byte {
 	return buf.Bytes()
 }
 
-func Zip(files []utils.File) (utils.File, error) {
+func Zip(files []utils.FileData) (utils.FileData, error) {
 	var buf bytes.Buffer
 
 	err := binary.Write(&buf, binary.BigEndian, uint32(len(files)))
 	if err != nil {
-		return utils.File{}, err
+		return utils.FileData{}, err
 	}
 
 	var rawContent bytes.Buffer
 	err = encoder.CreateContentBuffer(files, &rawContent)
 	if err != nil {
-		return utils.File{}, err
+		return utils.FileData{}, err
 	}
 
 	freq := calculateFrequencies(rawContent.Bytes())
@@ -87,27 +87,26 @@ func Zip(files []utils.File) (utils.File, error) {
 	encodedData := encodeBinary(code, numBits)
 	err = binary.Write(&buf, binary.BigEndian, uint32(len(encodedData)))
 	if err != nil {
-		return utils.File{}, err
+		return utils.FileData{}, err
 	}
 	_, err = buf.Write(encodedData)
 	if err != nil {
-		return utils.File{}, err
+		return utils.FileData{}, err
 	}
 
 	err = writeProbabilityRangesToBuffer(ranges, &buf)
 	if err != nil {
-		return utils.File{}, err
+		return utils.FileData{}, err
 	}
 
-	return utils.File{
+	return utils.FileData{
 		Name:    "compressed.sq",
-		Content: buf.Bytes(),
 	}, nil
 }
 
-func Unzip(file utils.File) ([]utils.File, error) {
-	var files []utils.File
-	buf := bytes.NewBuffer(file.Content)
+func Unzip(file utils.FileData) ([]utils.FileData, error) {
+	var files []utils.FileData
+	buf := bytes.NewBuffer([]byte(""))
 
 	var numFiles uint32
 	err := binary.Read(buf, binary.BigEndian, &numFiles)

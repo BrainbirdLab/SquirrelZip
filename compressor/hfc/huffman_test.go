@@ -81,22 +81,16 @@ func CheckString(t *testing.T, testData []byte) error {
 	//reset the seek
 	inputReader.Seek(0, io.SeekStart)
 
-	fmt.Printf("Frequency generated: %d\n", len(freq))
-
-	codes, _, err := BuildHuffmanCodes(&freq)
+	codes, err := BuildHuffmanCodes(&freq)
 	if err != nil {
 		t.Fatalf("failed to build huffman codes: %v", err)
 	}
-
-	fmt.Printf("Codes generated: %d\n", len(codes))
 
 	//reset the seek
 	//inputReader.Seek(0, io.SeekStart)
 	if len(codes) == 0 {
 		return fmt.Errorf("failed to build huffman codes")
 	}
-
-	fmt.Printf("Codes: %v\n", codes)
 
 	compressedBytes := []byte{}
 	compressedBuffer := bytes.NewBuffer(compressedBytes)
@@ -107,10 +101,6 @@ func CheckString(t *testing.T, testData []byte) error {
 		t.Fatalf("failed to compress: %v", err)
 	}
 
-	compressedLength := len(compressedBuffer.Bytes())
-
-	fmt.Printf("Compressed data: %08b\n", compressedBuffer.Bytes())
-
 	//decompress
 	decompressedBytes := []byte{}
 	decompressedBuffer := bytes.NewBuffer(decompressedBytes)
@@ -119,13 +109,9 @@ func CheckString(t *testing.T, testData []byte) error {
 	if err != nil {
 		t.Fatalf("failed to decompress: %v", err)
 	}
-	
-	fmt.Printf("Original length: %d, Compressed length: %d, Decompressed length: %d\n", len(testData), compressedLength, len(decompressedBuffer.Bytes()))
-
-	fmt.Printf("Expected:\t%s\nGot:\t\t%s\n", string(testData), decompressedBuffer.String())
 
 	//compare original and decompressed data
-	if decompressedBuffer.String() != string(testData) {
+	if bytes.Equal(testData, decompressedBuffer.Bytes()) == false {
 		t.Fatal("original and decompressed data do not match")
 	}
 
@@ -172,6 +158,8 @@ func RunFile(targetPath string, t *testing.T) {
 
 	compressedFile.Close()
 
+	
+
 	inputStat, err := inputFile.Stat()
 	if err != nil {
 		t.Fatalf("failed to get input file info: %v", err)
@@ -209,5 +197,5 @@ func RunFile(targetPath string, t *testing.T) {
 	compressedFile.Close()
 	
 	//remove temp files
-	os.Remove(tempCompressPath)
+	//os.Remove(tempCompressPath)
 }

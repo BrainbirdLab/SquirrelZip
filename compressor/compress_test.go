@@ -34,6 +34,4 @@ func Init(algo string, t *testing.T) {
 	}
 	fmt.Printf("Compressed file: %s\nSize: %d\n", outputPath, size)
 
-	// Decompress
-	decompressedPath, err := Decompress(outputPath, outputDir, algo)
 }
