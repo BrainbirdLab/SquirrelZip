@@ -47,6 +47,16 @@ func ColorPrint(color COLOR, message string) {
 	fmt.Printf(string(color), message)
 }
 
+func MakeOutputDir(outputDir string) error {
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		err := os.Mkdir(outputDir, 0777)
+		if err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+	return nil
+}
+
 func FileSize(sizeBytes int64) string {
 	var unit int64 = 1024
 	if sizeBytes < unit {
