@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-
-	//"file-compressor/utils"
 )
 
 func TestCompress(t *testing.T) {
@@ -23,20 +21,17 @@ func Init(algo string, t *testing.T) {
 	fileNameStrs := make([]string, 0)
 	for _, file := range testFiles {
 		fileNameStrs = append(fileNameStrs, fmt.Sprintf("%s/%s", testFilesDir, file.Name()))
-		fmt.Printf("Found file: %s\n", file.Name())
 	}
 
 	outputDir := "test_files/compress_output"
-	outputPath, size, err := Compress(fileNameStrs, outputDir, "", algo)
+	_, _, err = Compress(fileNameStrs, outputDir, "", algo)
 	if err != nil {
 		t.Fatalf("failed to compress files: %v", err)
 	}
-	fmt.Printf("Compressed file: %s\nSize: %d\n", outputPath, size)
 }
 
 func TestDecompress(t *testing.T) {
 	InitDecompress(t)
-	//InitDecompress("arithmetic", t)
 }
 
 func InitDecompress(t *testing.T) {

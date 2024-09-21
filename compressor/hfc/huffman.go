@@ -249,25 +249,15 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 	// if there are remaining bits in the current byte, write them to the output
 	if bitCount > 0 {
 		// Pad the last byte with zeros
-		fmt.Printf("Padding with %d bits\n", 8-bitCount)
 		currentByte <<= 8 - bitCount
-		/*
-			if _, err := output.Write([]byte{currentByte}); err != nil {
-				return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
-			}
-		*/
-
 		if err := binary.Write(output, binary.LittleEndian, currentByte); err != nil {
 			return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
 		}
 	} else {
-		fmt.Printf("Padding with 0\n")
 		if err := binary.Write(output, binary.LittleEndian, byte(0)); err != nil {
 			return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
 		}
 	}
-
-	fmt.Printf("Last byte count: %d\n", bitCount)
 	// Write the number of bits in the last byte
 	if err := binary.Write(output, binary.LittleEndian, bitCount); err != nil {
 		return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
@@ -313,7 +303,7 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 	lastByte := make([]byte, 1)
 	lastByteCount := make([]byte, 1)
 
-	leftOverByte := byte(0)
+	leftOverByte := uint32(0)
 	leftOverByteCount := uint8(0)
 
 	loopFlag := 0
@@ -326,8 +316,6 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 
 	bytesToRead := BUFFER_SIZE
 
-	fmt.Printf("Limiter: %d\n", limiter)
-
 	for {
 
 		if dataRead <= limiter {
@@ -339,11 +327,12 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 		if err != nil && err != io.EOF {
 			return err
 		}
+
 		dataRead += uint64(n)
 
 		if n == 0 {
 
-			err := decompressRemainingBits(leftOverByte, uint8(leftOverByteCount), uint8(lastByteCount[0]), lastByte[0], writer, root)
+			err := decompressRemainingBits(leftOverByte, leftOverByteCount, uint8(lastByteCount[0]), lastByte[0], writer, root)
 			if err != nil {
 				return fmt.Errorf(ec.ERROR_COMPRESS, err)
 			}
@@ -380,12 +369,12 @@ func adjustBuffer(loopFlag int, n *int, lastByte *[]byte, lastByteCount *[]byte,
 	*readBuffer = (*readBuffer)[:*n-2]
 }
 
-func decompressFullByte(readBuffer []byte, leftOverByte *byte, leftOverByteCount *uint8, currentNode **Node, root **Node, writer io.Writer) error {
+func decompressFullByte(readBuffer []byte, leftOverByte *uint32, leftOverByteCount *uint8, currentNode **Node, root **Node, writer io.Writer) error {
 	for _, b := range readBuffer {
 		for i := 7; i >= 0; i-- {
 			bit := (b >> i) & 1
 			*leftOverByte <<= 1
-			*leftOverByte |= bit
+			*leftOverByte |= uint32(bit)
 			*leftOverByteCount++
 			if bit == 0 {
 				*currentNode = (*currentNode).left
@@ -406,11 +395,13 @@ func decompressFullByte(readBuffer []byte, leftOverByte *byte, leftOverByteCount
 	return nil
 }
 
-func decompressRemainingBits(remainingBits byte, remainingBitsLen uint8, numOfBits uint8, lastByte byte, output io.Writer, root *Node) error {
+func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOfBits uint8, lastByte byte, output io.Writer, root *Node) error {
 	// include the last byte in the remaining bits
 	for j := 7; j >= 8-int(numOfBits); j-- {
 		bit := (lastByte >> j) & 1
-		remainingBits = (remainingBits << 1) | bit
+		//remainingBits = (remainingBits << 1) | bit
+		remainingBits <<= 1
+		remainingBits |= uint32(bit)
 		remainingBitsLen++
 	}
 
@@ -445,8 +436,6 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		return fmt.Errorf("error preparing codes: %w", err)
 	}
 
-	fmt.Printf("returned codes has emojis: %v\n", codes['🥺'])
-
 	// Write the number of files
 	if err := writeNumOfFiles(uint64(len(files)), output); err != nil {
 		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
@@ -455,19 +444,15 @@ func Zip(files []utils.FileData, output io.Writer) error {
 	for _, file := range files {
 		reader := file.Reader
 
-		fmt.Printf("Compressing file: %s\n", file.Name)
 		//Compress and write the file name
 		if err = writeFileName(file.Name, output, codes); err != nil {
 			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
 		}
 
-		fmt.Println("Keeping placeholder for compressed size")
 		//write 32 bit 0 for the compressed size
 		if err := binary.Write(output, binary.LittleEndian, uint64(0)); err != nil {
 			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
 		}
-
-		fmt.Println("Compressing data")
 		//Compress and write the data
 		compressedLen, err := compressData(reader, output, codes)
 
@@ -498,22 +483,16 @@ func generateCodes(files *[]utils.FileData, output io.Writer) (map[rune]string, 
 	//first, we need to get the frequency map
 	for _, file := range *files {
 
-		fmt.Printf("Making codes for file: %s\n", file.Name)
-		fmt.Printf("freq 0 : %v\n", freq)
 		//Get frequency map of the input file name
 		nameBuf := bytes.NewReader([]byte(file.Name))
 		if err := getFrequencyMap(nameBuf, &freq); err != nil {
 			return nil, fmt.Errorf("error generating frequency map for filename: %w", err)
 		}
 
-		fmt.Printf("freq 1 : %v\n", freq)
-
 		//Get frequency map of the input data
 		if err := getFrequencyMap(file.Reader, &freq); err != nil {
 			return nil, fmt.Errorf("error generating frequency map for filedata: %w", err)
 		}
-
-		fmt.Printf("freq 3 : %v\n", freq)
 
 		//reset the seek
 		if _, err := file.Reader.(io.Seeker).Seek(0, io.SeekStart); err != nil {
@@ -541,17 +520,10 @@ func writeFileName(fileName string, output io.Writer, codes map[rune]string) err
 
 	compressedNameBuf := bytes.NewBuffer([]byte{})
 
-	fmt.Printf("File name is compressing: %s\n", fileName)
 	compLen, err := compressData(nameBuf, compressedNameBuf, codes)
 	if err != nil {
 		return fmt.Errorf(ec.ERROR_COMPRESS, err)
 	}
-
-	fmt.Printf("Compressed file name length raw: %d\n", compLen)
-	fmt.Printf("Compressed file name length buff: %d\n", compressedNameBuf.Len())
-
-	//compressed file in binary
-	fmt.Printf("Compressed file name: %08b\n", compressedNameBuf.Bytes())
 
 	// write length of the file name buffer
 	if err := binary.Write(output, binary.LittleEndian, uint16(compLen)); err != nil {
@@ -562,27 +534,6 @@ func writeFileName(fileName string, output io.Writer, codes map[rune]string) err
 	if err := binary.Write(output, binary.LittleEndian, compressedNameBuf.Bytes()); err != nil {
 		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
 	}
-
-	//let decompressData know that the file name is compressed, for debugging purposes
-	fmt.Printf("File name: %s\n", fileName)
-	decom := bytes.NewBuffer([]byte{})
-	if err := decompressData(compressedNameBuf, decom, codes, uint64(compLen)); err != nil {
-		return fmt.Errorf(ec.ERROR_DECOMPRESS, err)
-	}
-
-	fmt.Printf("Decompressed file name: %s\n", decom.String())
-
-	/*
-		// Write the file name length
-		if err := binary.Write(output, binary.LittleEndian, uint8(len(fileName))); err != nil {
-			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
-		}
-
-		// Write the file name
-		if _, err := output.Write([]byte(fileName)); err != nil {
-			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
-		}
-	*/
 
 	return nil
 }
@@ -612,14 +563,10 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 		return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
 	}
 
-	fmt.Printf("File name length: %d\n", nameLen)
-
 	buf := make([]byte, nameLen)
 	if err := binary.Read(input, binary.LittleEndian, buf); err != nil {
 		return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
 	}
-
-	fmt.Printf("Compressed file name: %08b\n", buf)
 
 	compressedFilename := bytes.NewBuffer(buf)
 
@@ -629,24 +576,6 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 	}
 
 	name := nameBuffer.String()
-
-	/*
-		var nameLen uint8
-		if err := binary.Read(input, binary.LittleEndian, &nameLen); err != nil {
-			return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
-		}
-
-		fmt.Printf("File name length: %d\n", nameLen)
-
-		nameBuf := make([]byte, nameLen)
-		if _, err := input.Read(nameBuf); err != nil {
-			return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
-		}
-
-		fmt.Printf("File name: %s\n", string(nameBuf))
-
-		name := string(nameBuf)
-	*/
 
 	return name, nil
 }
@@ -668,8 +597,6 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Number of files: %d\n", numOfFiles)
-
 	if numOfFiles < 1 {
 		return nil, errors.New("no files to decompress")
 	}
@@ -677,7 +604,6 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 	filePaths := []string{}
 
 	for i := uint64(0); i < numOfFiles; i++ {
-		fmt.Printf("File: %d\n", i+1)
 		// get the file name
 		fileName, err := readFileName(input, codes)
 		if err != nil {
@@ -698,22 +624,16 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 			return nil, fmt.Errorf(ec.FILE_CREATE_ERROR, err)
 		}
 
-		fmt.Printf("Output file: %s\n", fileName)
-
 		// read the compressed size
 		var compressedSize uint64
 		if err := binary.Read(input, binary.LittleEndian, &compressedSize); err != nil {
 			return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
 		}
 
-		fmt.Printf("Compressed-size: %d\n", compressedSize)
-
 		err = decompressData(input, outputFile, codes, compressedSize)
 		if err != nil {
 			return nil, fmt.Errorf(ec.ERROR_DECOMPRESS, err)
 		}
-
-		fmt.Printf("File: %s decompressed.\n", fileName)
 
 		outputFile.Close()
 
