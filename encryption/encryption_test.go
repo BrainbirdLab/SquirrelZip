@@ -1,6 +1,8 @@
 package encryption
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -12,81 +14,93 @@ var fatalDecrPassErr string = "failed to decrypt data with password: %v"
 
 func TestEncryptWithPassword(t *testing.T) {
 
-	output := input
+	reader := bytes.NewReader(input)
 
-	err := Encrypt(&output, password)
+	encryptedData := bytes.NewBuffer([]byte{})
+
+	err := EncryptStream(reader, encryptedData, password)
 	if err != nil {
 		t.Fatalf(fatalEncrPassErr, err)
 	}
 
-	err = Decrypt(&output, password)
+	decryptedData := bytes.NewBuffer([]byte{})
+	encryptedReader := bytes.NewReader(encryptedData.Bytes())
 
+	err = DecryptStream(encryptedReader, decryptedData, password)
 	if err != nil {
 		t.Fatalf(fatalDecrPassErr, err)
 	}
 
-	if string(output) != string(input) {
-		t.Fatalf("decrypted data does not match original data: decrypted(%v) != test(%v)", string(output), string(input))
+	if decryptedData.String() != string(input) {
+		t.Fatalf("decrypted data does not match original data: decrypted(%v) != test(%v)", decryptedData.String(), input)
 	}
 }
 
 func TestEncryptWithoutPassword(t *testing.T) {
+	
+	reader := bytes.NewReader(input)
 
-	password := ""
+	encryptedData := bytes.NewBuffer([]byte{})
 
-	output := input
-
-	err := Encrypt(&output, password)
+	err := EncryptStream(reader, encryptedData, "")
 	if err != nil {
-		t.Fatalf("failed to encrypt data without password: %v", err)
+		t.Fatalf(fatalEncrPassErr, err)
 	}
 
-	err = Decrypt(&output, password)
+	decryptedData := bytes.NewBuffer([]byte{})
+	encryptedReader := bytes.NewReader(encryptedData.Bytes())
 
+	err = DecryptStream(encryptedReader, decryptedData, "")
 	if err != nil {
-		t.Fatalf("failed to decrypt data without password: %v", err)
+		t.Fatalf(fatalDecrPassErr, err)
 	}
 
-	if string(output) != string(input) {
-		t.Fatalf("decrypted data does not match original data: decrypted(%v) != test(%v)", string(output), input)
+	if decryptedData.String() != string(input) {
+		t.Fatalf("decrypted data does not match original data: decrypted(%v) != test(%v)", decryptedData.String(), input)
 	}
 }
 
 func TestDecryptInvalidData(t *testing.T) {
 
-	password := "test1234"
+	reader := bytes.NewReader(input)
 
-	output := input
+	encryptedData := bytes.NewBuffer([]byte{})
 
-	err := Encrypt(&output, password)
+	err := EncryptStream(reader, encryptedData, "")
 	if err != nil {
-		t.Fatalf(fatalDecrPassErr, err)
+		t.Fatalf(fatalEncrPassErr, err)
 	}
 
-	// Modify the encrypted data
-	output[0] = 2
+	// write 3 in index 0 to make the data invalid
+	encryptedData.Bytes()[0] = 3
 
-	err = Decrypt(&output, password)
+	decryptedData := bytes.NewBuffer([]byte{})
+	encryptedReader := bytes.NewReader(encryptedData.Bytes())
 
+	err = DecryptStream(encryptedReader, decryptedData, "")
 	if err == nil {
-		t.Fatalf("expected error but got nil")
+		t.Fatalf("decryption should have failed")
 	}
 }
 
 func TestDecryptInvalidPassword(t *testing.T) {
 	
-	output := input
+	reader := bytes.NewReader(input)
 
-	err := Encrypt(&output, password)
+	encryptedData := bytes.NewBuffer([]byte{})
+
+	err := EncryptStream(reader, encryptedData, password)
 	if err != nil {
 		t.Fatalf(fatalEncrPassErr, err)
 	}
 
-	invalidPass := "invalid password"
+	decryptedData := bytes.NewBuffer([]byte{})
+	encryptedReader := bytes.NewReader(encryptedData.Bytes())
 
-	err = Decrypt(&output, invalidPass)
-
+	err = DecryptStream(encryptedReader, decryptedData, "invalid")
 	if err == nil {
-		t.Fatalf("expected error but got nil")
+		t.Fatalf("decryption should have failed")
 	}
+
+	fmt.Printf("Error successfully caught: %v\n", err)
 }
