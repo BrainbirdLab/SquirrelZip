@@ -34,7 +34,6 @@ func ParseDecompressedContent(files *[]utils.FileData, numFiles *uint32, decompr
 		}
 		*files = append(*files, utils.FileData{
 			Name:    string(name),
-			Content: content,
 		})
 	}
 	return nil
@@ -54,12 +53,12 @@ func CreateContentBuffer(files []utils.FileData, rawContent *bytes.Buffer) error
 		}
 
 		// Write content length and content
-		contentLen := uint32(len(file.Content))
+		contentLen := uint32(0)
 		err = binary.Write(rawContent, binary.BigEndian, contentLen)
 		if err != nil {
 			return err
 		}
-		_, err = rawContent.Write(file.Content)
+		_, err = rawContent.Write([]byte(""))
 		if err != nil {
 			return err
 		}
