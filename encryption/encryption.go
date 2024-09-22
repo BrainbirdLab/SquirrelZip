@@ -6,13 +6,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-)
 
-// Constants
-const (
-	NO_PASSWORD byte = 43
-	PASSWORD    byte = 57
-	BufferSize     = 1024
+	"file-compressor/constants"
 )
 
 // EncryptStream encrypts data from an io.Reader and writes the encrypted data to an io.Writer
@@ -50,9 +45,9 @@ func DecryptStream(reader io.Reader, writer io.Writer, password string) error {
 func writeMetadata(writer io.Writer, password string) error {
 	var metadata []byte
 	if password == "" {
-		metadata = append(metadata, NO_PASSWORD) // No password
+		metadata = append(metadata, constants.NO_PASSWORD) // No password
 	} else {
-		metadata = append(metadata, PASSWORD) // Password used
+		metadata = append(metadata, constants.PASSWORD) // Password used
 	}
 	_, err := writer.Write(metadata)
 	return err
@@ -65,9 +60,9 @@ func readMetadata(reader io.Reader) (bool, error) {
 		return false, fmt.Errorf("failed to read metadata: %v", err)
 	}
 	switch metadata[0] {
-	case NO_PASSWORD:
+	case constants.NO_PASSWORD:
 		return false, nil
-	case PASSWORD:
+	case constants.PASSWORD:
 		return true, nil
 	default:
 		return false, fmt.Errorf("invalid metadata")
@@ -113,6 +108,11 @@ func encryptWithPassword(reader io.Reader, writer io.Writer, password string) er
 
 // decryptWithPassword decrypts data using AES-GCM with a password
 func decryptWithPassword(reader io.Reader, writer io.Writer, password string) error {
+
+	if password == "" {
+		return fmt.Errorf("password required for decryption")
+	}
+
 	key, err := generateKey(password)
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func generateNonce(gcm cipher.AEAD) ([]byte, error) {
 
 // processStream reads from the reader, encrypts each chunk, and writes it to the writer
 func processStream(reader io.Reader, writer io.Writer, gcm cipher.AEAD, nonce []byte) error {
-	buf := make([]byte, BufferSize)
+	buf := make([]byte, constants.BUFFER_SIZE)
 	for {
 		n, err := reader.Read(buf)
 		if err != nil && err != io.EOF {
@@ -171,7 +171,7 @@ func processStream(reader io.Reader, writer io.Writer, gcm cipher.AEAD, nonce []
 
 // decryptStream reads from the reader, decrypts each chunk, and writes it to the writer
 func decryptStream(reader io.Reader, writer io.Writer, gcm cipher.AEAD, nonce []byte) error {
-	buf := make([]byte, BufferSize+gcm.Overhead())
+	buf := make([]byte, constants.BUFFER_SIZE+gcm.Overhead())
 	for {
 		n, err := reader.Read(buf)
 		if err != nil && err != io.EOF {

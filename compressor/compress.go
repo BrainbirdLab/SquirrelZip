@@ -6,10 +6,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"file-compressor/compressor/hfc"
+	"file-compressor/constants"
 	"file-compressor/utils"
-	ec "file-compressor/errorConstants"
 )
 
 func CheckCompressionAlgorithm(algo string) error {
@@ -31,66 +32,88 @@ algorithm: the compression algorithm to use
 
 returns the path to the compressed file, the original size of the files, and an error if any
 */
-func Compress(filenameStrs []string, outputDir, password, algorithm string) (string, int64, error) {
+func Compress(filenameStrs []string, outputDir, password, algorithm string) (string, utils.FilesRatio, error) {
+
+	fileMeta := utils.FilesRatio{}
+	//check if files exist
+	for _, filenameStr := range filenameStrs {
+		if _, err := os.Stat(filenameStr); os.IsNotExist(err) {
+			return "", fileMeta, fmt.Errorf("file '%s' does not exist", filenameStr)
+		}
+	}
 
 	// Check if the compression algorithm is supported
 	err := CheckCompressionAlgorithm(algorithm)
 	if err != nil {
-		return "", 0, err
+		return "", fileMeta, err
 	}
 
-	// Set default output directory as the directory of the first file if not provided
+	// Set default output directory if not provided
 	setOutputDir(&outputDir, filenameStrs[0])
-
 
 	// Check if the output directory exists, create it if it doesn't
 	if err := utils.MakeOutputDir(outputDir); err != nil {
-		return "", 0, err
+		return "", fileMeta, err
 	}
 
-	var originalSize int64
 
-	//var compressedSize int64
-	outputFilename := []byte("compressed.sq")
-	filePath := filepath.Join(outputDir, string(outputFilename))
-
+	fileName := filenameStrs[0]
+	ext := filepath.Ext(fileName)
+	fileName = strings.TrimSuffix(fileName, ext)
+	fileName = fmt.Sprintf("%s.sq", fileName) // use the first filename as default output filename
+	fileName = utils.InvalidateFileName(fileName, outputDir)
 	// Create a writer to write the compressed data
-	outputFile, err := os.Create(filePath)
+	outputFile, err := os.Create(fileName)
 	if err != nil {
-		return "", 0, fmt.Errorf(ec.ERROR_COMPRESS, err)
+		return "", fileMeta, fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
 
-	defer outputFile.Close()
+	
+	originalSize, err := ReadAndCompressFiles(filenameStrs, outputFile, algorithm)
+	if err != nil {
+		return "", fileMeta, err
+	}
 
-	err = ReadAndCompressFiles(filenameStrs, outputFile, &originalSize, algorithm)
+	outputFile.Close()
+	compressedStat, err := os.Stat(fileName)
+	if err != nil {
+		return "", fileMeta, fmt.Errorf(constants.FILE_STAT_ERROR, err)
+	}
 
-	return filePath, originalSize, err
+	fileMeta = utils.NewFilesRatio(originalSize, uint64(compressedStat.Size()))
+
+	return fileName, fileMeta, err
 }
 
 // ReadAndCompressFiles reads all files concurrently and writes the compressed data to the output.
-func ReadAndCompressFiles(filenameStrs []string, output io.Writer, originalSize *int64, algorithm string) error {
+func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm string) (uint64, error) {
 
 	var err error
 
 	fileDataArr := []utils.FileData{}
 
+	originalSize := uint64(0)
+
 	for _, filenameStr := range filenameStrs {
+		// Get the file info
 		fileInfo, err := os.Stat(filenameStr)
 		if err != nil {
-			return fmt.Errorf("failed to get file info: %v", err)
+			return 0, fmt.Errorf("failed to get file info: %v", err)
 		}
 
-		*originalSize += fileInfo.Size()
+		fmt.Printf("File info: %s, size: %d\n", filenameStr, fileInfo.Size())
+
+		originalSize += uint64(fileInfo.Size())
 
 		// Check if the file is a directory
 		if fileInfo.IsDir() {
 			if err := walkDir(filenameStr, &fileDataArr); err != nil {
-				return err
+				return 0, err
 			}
 		} else {
 			file, err := os.Open(filenameStr)
 			if err != nil {
-				return fmt.Errorf(ec.FILE_OPEN_ERROR, err)
+				return 0, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 			}
 
 			defer file.Close()
@@ -107,31 +130,30 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, originalSize 
 
 	// Write the compression algorithm to the output
 	if err := writeAlgorithm(output, algorithm); err != nil {
-		return err
+		return 0, err
 	}
 
 	switch utils.Algorithm(algorithm) {
 	case utils.HUFFMAN:
 		err = hfc.Zip(fileDataArr, output)
 	}
-	// Compress the files
-	
+
 	if err != nil {
-		return fmt.Errorf(ec.ERROR_COMPRESS, err)
+		return 0, fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
 
-	return err
+	return originalSize, nil
 }
 
 func writeAlgorithm(output io.Writer, algorithm string) error {
 	// write the length of compression algorithm
 	if err := binary.Write(output, binary.LittleEndian, uint8(len(algorithm))); err != nil {
-		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	// write the compression algorithm
 	if err := binary.Write(output, binary.LittleEndian, []byte(algorithm)); err != nil {
-		return fmt.Errorf(ec.BUFFER_WRITE_ERROR, err)
+		return fmt.Errorf(constants.BUFFER_WRITE_ERROR, err)
 	}
 
 	return nil
@@ -147,7 +169,7 @@ func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorit
 		// Decompress the file
 		fileNames, err = hfc.Unzip(compressedFile, outputDir)
 		if err != nil {
-			return nil, fmt.Errorf(ec.ERROR_DECOMPRESS, err)
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 		}
 	}
 
@@ -164,12 +186,18 @@ algorithm: the compression algorithm used
 returns the list of decompressed files and an error if any
 */
 func Decompress(compressedFilePath, outputDir, password string) ([]string, error) {
+
+	// check if the compressed file exists
+	if _, err := os.Stat(compressedFilePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("compressed file '%s' does not exist", compressedFilePath)
+	}
+
 	outputFiles := make([]string, 0)
 
 	// Open the compressed file
 	compressedFile, err := os.Open(compressedFilePath)
 	if err != nil {
-		return nil, fmt.Errorf(ec.FILE_OPEN_ERROR, err)
+		return nil, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 	}
 
 	defer compressedFile.Close()
@@ -208,13 +236,13 @@ func readAlgorithm(compressedFile io.Reader) ([]byte, error) {
 
 	// read the length of compression algorithm
 	if err = binary.Read(compressedFile, binary.LittleEndian, &algoLen); err != nil {
-		return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	// read the compression algorithm
 	algo := make([]byte, algoLen)
 	if err = binary.Read(compressedFile, binary.LittleEndian, &algo); err != nil {
-		return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	return algo, nil
@@ -240,7 +268,7 @@ func walkDir(filenameStr string, fileDataArr *[]utils.FileData) error {
 
 		file, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf(ec.FILE_OPEN_ERROR, err)
+			return fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 		}
 		defer file.Close()
 

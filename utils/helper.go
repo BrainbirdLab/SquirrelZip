@@ -57,12 +57,12 @@ func MakeOutputDir(outputDir string) error {
 	return nil
 }
 
-func FileSize(sizeBytes int64) string {
-	var unit int64 = 1024
+func FileSize(sizeBytes uint64) string {
+	var unit uint64 = 1024
 	if sizeBytes < unit {
 		return fmt.Sprintf("%d B", sizeBytes)
 	}
-	div, exp := int64(unit), 0
+	div, exp := uint64(unit), 0
 	for n := sizeBytes / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
@@ -98,11 +98,11 @@ func TimeTrack(startTime, endTime time.Time) string {
 }
 
 type FilesRatio struct {
-	inital int64
-	compressed int64
+	inital uint64
+	compressed uint64
 }
 
-func NewFilesRatio(initial, compressed int64) FilesRatio {
+func NewFilesRatio(initial, compressed uint64) FilesRatio {
 	return FilesRatio{
 		inital: initial,
 		compressed: compressed,
@@ -123,16 +123,20 @@ func InvalidateFileName(filename string, outputDir string) string {
 	fileExt := filepath.Ext(filename)
 	//extract the file name without the extension
 	filename = filepath.Base(filename)
-	filename = strings.TrimSuffix(filename, fileExt)
+	originalName := strings.TrimSuffix(filename, fileExt)
+
+	finalFile := filepath.Join(outputDir, originalName + fileExt)
 
 	count := 1
 	for {
-		if _, err := os.Stat(filepath.Join(outputDir, filename+fmt.Sprintf("_%d%s", count, fileExt))); os.IsNotExist(err) {
-			ColorPrint(PURPLE, fmt.Sprintf("File %s already exists, renaming to %s\n", filename, filename+fmt.Sprintf("_%d%s", count, fileExt)))
-			filename = filename + fmt.Sprintf("_%d%s", count, fileExt)
+		//if file already exists, add a number to the filename before the extension and check again
+		if _, err := os.Stat(finalFile); err == nil {
+			filename = fmt.Sprintf("%s_%d", originalName, count)
+			finalFile = filepath.Join(outputDir, filename + fileExt)
+		} else {
 			break
 		}
 		count++
 	}
-	return filename
+	return finalFile
 }

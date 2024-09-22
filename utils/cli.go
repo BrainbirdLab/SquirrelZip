@@ -120,12 +120,12 @@ var flagSet = NewFlagSet()
 
 func initFlags() (map[string]interface{}, error) {
 	flagSet.Bool("v", "Print version")
-	flagSet.ArrayStr("c", "Input files or directory to be compressed")
-	flagSet.String("o", "Output directory to compressed/decompress files (Optional)")
-	flagSet.String("a", "Algorithm to use for compression (Optional)")
-	flagSet.String("p", "Password for encryption (Optional)")
+	flagSet.ArrayStr("c", "Input files or directory to be compressed [strings]")
+	flagSet.String("o", "Output directory to compressed/decompress files (Optional) [string]")
+	flagSet.String("a", "Algorithm to use for compression (Optional) [string]")
+	flagSet.String("p", "Password for encryption (Optional) [string]")
 	flagSet.Bool("all", "Read all files in the input directory (Optional)")
-	flagSet.ArrayStr("d", "Input file to decompress")
+	flagSet.ArrayStr("d", "Input file to decompress [strings]")
 	flagSet.Bool("h", "Print help")
 
 	err := flagSet.Parse(os.Args[1:])
@@ -176,7 +176,7 @@ func setupDecompressMode(Mode *MODE, inputToDecompress []string, filenameStrs *[
 	*filenameStrs = append(*filenameStrs, inputToDecompress[0])
 }
 
-func ParseCLI() ([]string, *string, *string, MODE, string) {
+func ParseCLI() ([]string, string, string, MODE, string) {
 	// CLI arguments
 
 	values, err := initFlags()
@@ -235,7 +235,19 @@ func ParseCLI() ([]string, *string, *string, MODE, string) {
 		os.Exit(1)
 	}
 
-	return filenameStrs, &outputDir, &password, Mode, algorithm
+	//check if algorithm is provided
+	switch algorithm {
+	case "":
+		algorithm = "huffman"
+	case "huffman":
+		break
+	default:
+		ColorPrint(RED, fmt.Sprintf("Unsupported algorithm: %s\n", algorithm))
+		flagSet.Usage()
+		os.Exit(1)
+	}
+
+	return filenameStrs, outputDir, password, Mode, algorithm
 }
 
 

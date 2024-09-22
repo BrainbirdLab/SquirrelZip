@@ -10,12 +10,8 @@ import (
 	"os"
 	"path"
 
-	ec "file-compressor/errorConstants"
+	"file-compressor/constants"
 	"file-compressor/utils"
-)
-
-const (
-	BUFFER_SIZE = 256
 )
 
 // Node represents a node in the Huffman tree.
@@ -128,11 +124,11 @@ func rebuildHuffmanTree(codes map[rune]string) *Node {
 }
 
 func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
-	buf := make([]byte, 256)
+	buf := make([]byte, constants.BUFFER_SIZE)
 	for {
 		n, err := input.Read(buf)
 		if err != nil && err != io.EOF {
-			return fmt.Errorf(ec.BUFFER_READ_ERROR, err)
+			return fmt.Errorf(constants.BUFFER_READ_ERROR, err)
 		}
 		if n == 0 {
 			break // EOF reached
@@ -148,7 +144,7 @@ func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
 
 func WriteHuffmanCodes(file io.Writer, codes map[rune]string) error {
 	//write the number of codes
-	binary.Write(file, binary.LittleEndian, uint16(len(codes)))
+	binary.Write(file, binary.LittleEndian, uint32(len(codes)))
 
 	for k, v := range codes {
 		//write the rune
@@ -183,29 +179,29 @@ func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 	codes := make(map[rune]string)
 
 	// Read the number of codes (4 bytes, uint32)
-	var numCodes uint16
+	var numCodes uint32
 	if err := binary.Read(file, binary.LittleEndian, &numCodes); err != nil {
-		return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	// Read each code
-	for i := uint16(0); i < numCodes; i++ {
+	for i := uint32(0); i < numCodes; i++ {
 		// Read the rune
 		var r uint32
 		if err := binary.Read(file, binary.LittleEndian, &r); err != nil {
-			return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
 
 		// Read the length of the Huffman code (1 byte)
 		var codeLen byte
 		if err := binary.Read(file, binary.LittleEndian, &codeLen); err != nil {
-			return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
 
 		// Read the code bits (packed into bytes)
 		codeBits := make([]byte, (codeLen+7)/8) // (codeLen+7)/8 ensures enough space to hold all bits
 		if _, err := file.Read(codeBits); err != nil {
-			return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
 
 		// Convert the code bits back into a string of '0's and '1's
@@ -231,19 +227,19 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 	var currentByte byte
 	var bitCount uint8
 	compressedLength := uint64(0)
-	buf := make([]byte, 256)
+	buf := make([]byte, constants.BUFFER_SIZE)
 
 	for {
 		n, err := input.Read(buf)
 		if err != nil && err != io.EOF {
-			return 0, fmt.Errorf(ec.BUFFER_READ_ERROR, err)
+			return 0, fmt.Errorf(constants.BUFFER_READ_ERROR, err)
 		}
 		if n == 0 {
 			break // EOF reached
 		}
 
 		if err := processByte(buf[:n], output, codes, &currentByte, &bitCount, &compressedLength); err != nil {
-			return 0, fmt.Errorf(ec.ERROR_COMPRESS, err)
+			return 0, fmt.Errorf(constants.ERROR_COMPRESS, err)
 		}
 	}
 	// if there are remaining bits in the current byte, write them to the output
@@ -251,16 +247,16 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 		// Pad the last byte with zeros
 		currentByte <<= 8 - bitCount
 		if err := binary.Write(output, binary.LittleEndian, currentByte); err != nil {
-			return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+			return 0, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 	} else {
 		if err := binary.Write(output, binary.LittleEndian, byte(0)); err != nil {
-			return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+			return 0, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 	}
 	// Write the number of bits in the last byte
 	if err := binary.Write(output, binary.LittleEndian, bitCount); err != nil {
-		return 0, fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return 0, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	compressedLength += 2 // 1 byte for the last byte and 1 byte for the number of bits in the last byte
@@ -274,7 +270,8 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 		char := rune(b)
 		code, exists := codes[char]
 		if !exists {
-			return fmt.Errorf("no Huffman code for character %c", char)
+			return fmt.Errorf("no Huffman code for character (%b) - (%c)", char, char)
+			//continue
 		}
 
 		for _, bit := range code {
@@ -286,7 +283,7 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 			*bitCount++
 			if *bitCount == 8 {
 				if _, err := output.Write([]byte{*currentByte}); err != nil {
-					return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+					return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 				}
 				*currentByte = 0
 				*bitCount = 0
@@ -314,12 +311,12 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 
 	dataRead := uint64(0)
 
-	bytesToRead := BUFFER_SIZE
+	bytesToRead := constants.BUFFER_SIZE
 
 	for {
 
 		if dataRead <= limiter {
-			bytesToRead = int(min(BUFFER_SIZE, limiter-dataRead))
+			bytesToRead = int(min(constants.BUFFER_SIZE, limiter-dataRead))
 		}
 
 		readBuffer := make([]byte, bytesToRead)
@@ -334,7 +331,7 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 
 			err := decompressRemainingBits(leftOverByte, leftOverByteCount, uint8(lastByteCount[0]), lastByte[0], writer, root)
 			if err != nil {
-				return fmt.Errorf(ec.ERROR_COMPRESS, err)
+				return fmt.Errorf(constants.ERROR_COMPRESS, err)
 			}
 
 			break
@@ -343,7 +340,7 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 			adjustBuffer(loopFlag, &n, &lastByte, &lastByteCount, &readBuffer)
 
 			if err := decompressFullByte(readBuffer, &leftOverByte, &leftOverByteCount, &currentNode, &root, writer); err != nil {
-				return fmt.Errorf(ec.ERROR_COMPRESS, err)
+				return fmt.Errorf(constants.ERROR_COMPRESS, err)
 			}
 		}
 
@@ -383,7 +380,7 @@ func decompressFullByte(readBuffer []byte, leftOverByte *uint32, leftOverByteCou
 			}
 			if (*currentNode).left == nil && (*currentNode).right == nil {
 				if _, err := writer.Write([]byte{byte((*currentNode).char)}); err != nil {
-					return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+					return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 				}
 				*currentNode = *root
 				*leftOverByte = 0
@@ -419,7 +416,7 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 
 		if currentNode.left == nil && currentNode.right == nil {
 			if _, err := output.Write([]byte{byte(currentNode.char)}); err != nil {
-				return fmt.Errorf(ec.BUFFER_WRITE_ERROR, err)
+				return fmt.Errorf(constants.BUFFER_WRITE_ERROR, err)
 			}
 			currentNode = root
 		}
@@ -429,7 +426,7 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 }
 
 // Zip compresses data using Huffman coding and writes the compressed data to the output stream.
-func Zip(files []utils.FileData, output io.Writer) error {
+func Zip(files []utils.FileData, output io.Writer) (error) {
 
 	codes, err := generateCodes(&files, output)
 	if err != nil {
@@ -438,26 +435,27 @@ func Zip(files []utils.FileData, output io.Writer) error {
 
 	// Write the number of files
 	if err := writeNumOfFiles(uint64(len(files)), output); err != nil {
-		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
+
 
 	for _, file := range files {
 		reader := file.Reader
 
 		//Compress and write the file name
 		if err = writeFileName(file.Name, output, codes); err != nil {
-			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 
 		//write 32 bit 0 for the compressed size
 		if err := binary.Write(output, binary.LittleEndian, uint64(0)); err != nil {
-			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 		//Compress and write the data
 		compressedLen, err := compressData(reader, output, codes)
 
 		if err != nil {
-			return fmt.Errorf(ec.ERROR_COMPRESS, err)
+			return fmt.Errorf(constants.ERROR_COMPRESS, err)
 		}
 
 		//seek back to compressedLen bytes and write the compressed size
@@ -466,7 +464,7 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		}
 
 		if err := binary.Write(output, binary.LittleEndian, compressedLen); err != nil {
-			return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 
 		//seek back to the end of the file
@@ -508,7 +506,7 @@ func generateCodes(files *[]utils.FileData, output io.Writer) (map[rune]string, 
 
 	// Write frequency map and Huffman codes to the output
 	if err := WriteHuffmanCodes(output, codes); err != nil {
-		return nil, fmt.Errorf(ec.FAILED_WRITE_HUFFMAN_CODES, err)
+		return nil, fmt.Errorf(constants.FAILED_WRITE_HUFFMAN_CODES, err)
 	}
 
 	return codes, nil
@@ -522,17 +520,17 @@ func writeFileName(fileName string, output io.Writer, codes map[rune]string) err
 
 	compLen, err := compressData(nameBuf, compressedNameBuf, codes)
 	if err != nil {
-		return fmt.Errorf(ec.ERROR_COMPRESS, err)
+		return fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
 
 	// write length of the file name buffer
 	if err := binary.Write(output, binary.LittleEndian, uint16(compLen)); err != nil {
-		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	// write the compressed file name
 	if err := binary.Write(output, binary.LittleEndian, compressedNameBuf.Bytes()); err != nil {
-		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	return nil
@@ -541,7 +539,7 @@ func writeFileName(fileName string, output io.Writer, codes map[rune]string) err
 func readNumOfFiles(input io.Reader) (uint64, error) {
 	var numOfFiles uint64
 	if err := binary.Read(input, binary.LittleEndian, &numOfFiles); err != nil {
-		return 0, fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return 0, fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	return numOfFiles, nil
@@ -550,7 +548,7 @@ func readNumOfFiles(input io.Reader) (uint64, error) {
 func writeNumOfFiles(numOfFiles uint64, output io.Writer) error {
 
 	if err := binary.Write(output, binary.LittleEndian, numOfFiles); err != nil {
-		return fmt.Errorf(ec.FILE_WRITE_ERROR, err)
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	return nil
@@ -560,19 +558,19 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 
 	var nameLen uint16
 	if err := binary.Read(input, binary.LittleEndian, &nameLen); err != nil {
-		return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	buf := make([]byte, nameLen)
 	if err := binary.Read(input, binary.LittleEndian, buf); err != nil {
-		return "", fmt.Errorf(ec.FILE_READ_ERROR, err)
+		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	compressedFilename := bytes.NewBuffer(buf)
 
 	nameBuffer := bytes.NewBuffer([]byte{})
 	if err := decompressData(compressedFilename, nameBuffer, codes, uint64(nameLen)); err != nil {
-		return "", fmt.Errorf(ec.ERROR_DECOMPRESS, err)
+		return "", fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 	}
 
 	name := nameBuffer.String()
@@ -589,7 +587,7 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 
 	codes, err := ReadHuffmanCodes(input)
 	if err != nil {
-		return nil, fmt.Errorf(ec.FAILED_READ_HUFFMAN_CODES, err)
+		return nil, fmt.Errorf(constants.FAILED_READ_HUFFMAN_CODES, err)
 	}
 
 	numOfFiles, err := readNumOfFiles(input)
@@ -615,24 +613,24 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 		dir := path.Dir(fileName)
 
 		if err := utils.MakeOutputDir(dir); err != nil {
-			return nil, fmt.Errorf(ec.ERROR_CREATE_DIR, err)
+			return nil, fmt.Errorf(constants.ERROR_CREATE_DIR, err)
 		}
 
 		// writer
 		outputFile, err := os.Create(fileName)
 		if err != nil {
-			return nil, fmt.Errorf(ec.FILE_CREATE_ERROR, err)
+			return nil, fmt.Errorf(constants.FILE_CREATE_ERROR, err)
 		}
 
 		// read the compressed size
 		var compressedSize uint64
 		if err := binary.Read(input, binary.LittleEndian, &compressedSize); err != nil {
-			return nil, fmt.Errorf(ec.FILE_READ_ERROR, err)
+			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
 
 		err = decompressData(input, outputFile, codes, compressedSize)
 		if err != nil {
-			return nil, fmt.Errorf(ec.ERROR_DECOMPRESS, err)
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 		}
 
 		outputFile.Close()

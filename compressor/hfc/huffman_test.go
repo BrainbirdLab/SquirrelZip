@@ -4,18 +4,42 @@ import (
 	"bytes"
 	"file-compressor/utils"
 	"path"
-
-	//"encoding/binary"
-	//"file-compressor/utils"
 	"fmt"
 	"io"
 	"os"
-
-	//"fmt"
-	//"io"
-	//"os"
 	"testing"
 )
+
+func TestCompressedData(t *testing.T) {
+	path := []byte("compress_output/compressed.sq")
+	//read
+	file, err := os.Open(string(path))
+	if err != nil {
+		t.Fatalf("failed to open file: %v", err)
+	}
+
+	output, err := os.Create("compress_output/output.txt")
+	if err != nil {
+		t.Fatalf("failed to create output file: %v", err)
+	}
+
+	freq := make(map[rune]int)
+	getFrequencyMap(file, &freq)
+
+	fmt.Printf("Frequency: %v\n", freq)
+
+	codes, err := GetHuffmanCodes(&freq)
+	if err != nil {
+		t.Fatalf("failed to build huffman codes: %v", err)
+	}
+
+	fmt.Printf("Codes: %v\n", codes)
+
+	_, err = compressData(file, output, codes)
+	if err != nil {
+		t.Fatalf("failed to compress data: %v", err)
+	}
+}
 
 func TestFileRead(t *testing.T) {
 	file, err := os.Open("input/example.txt")
@@ -190,15 +214,13 @@ func RunFile(targetPath string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open compressed file again: %v", err)
 	}
-	
-	compressedStat, err := compressedFile.Stat()
+
+	stat, err := compressedFile.Stat()
 	if err != nil {
 		t.Fatalf("failed to get compressed file info: %v", err)
 	}
 	
-	compressedSize := compressedStat.Size()
-	
-	fileInfo := utils.NewFilesRatio(inputSize, compressedSize)
+	fileInfo := utils.NewFilesRatio(uint64(inputSize), uint64(stat.Size()))
 	fileInfo.PrintFileInfo()
 	
 	// Decompress
