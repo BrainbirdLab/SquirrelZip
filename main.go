@@ -40,7 +40,7 @@ func handleDecompress(fileName, outputDir, password string) {
 
 	utils.ColorPrint(utils.GREEN, "Decrypted file: " + decryptedFilePath + "\n")
 
-	paths, err := compressor.Decompress(decryptedFilePath, outputDir, password)
+	paths, err := compressor.Decompress(decryptedFilePath, outputDir)
 	if err != nil {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
 		// delete the decrypted file
@@ -57,7 +57,7 @@ func handleDecompress(fileName, outputDir, password string) {
 }
 
 func handleCompress(fileNames []string, outputDir, password, algorithm string) {
-	outputPath, fileMeta, err := compressor.Compress(fileNames, outputDir, password, algorithm)
+	outputPath, fileMeta, err := compressor.Compress(fileNames, outputDir, algorithm)
 	if err != nil {
 		utils.ColorPrint(utils.RED, err.Error() + "\n")
 		utils.SafeDeleteFile(outputPath)

@@ -32,7 +32,7 @@ algorithm: the compression algorithm to use
 
 returns the path to the compressed file, the original size of the files, and an error if any
 */
-func Compress(filenameStrs []string, outputDir, password, algorithm string) (string, utils.FilesRatio, error) {
+func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils.FilesRatio, error) {
 
 	fileMeta := utils.FilesRatio{}
 	//check if files exist
@@ -184,7 +184,7 @@ algorithm: the compression algorithm used
 
 returns the list of decompressed files and an error if any
 */
-func Decompress(compressedFilePath, outputDir, password string) ([]string, error) {
+func Decompress(compressedFilePath, outputDir string) ([]string, error) {
 
 	outputFiles := make([]string, 0)
 	// check if the compressed file exists
@@ -193,15 +193,15 @@ func Decompress(compressedFilePath, outputDir, password string) ([]string, error
 	}
 
 	// decrypt the compressed file first
-	decompressedFile, err := os.Create(compressedFilePath)
+	compressedFile, err := os.Open(compressedFilePath)
 	if err != nil {
-		return nil, fmt.Errorf(constants.FILE_CREATE_ERROR, err)
+		return outputFiles, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 	}
 
-	defer decompressedFile.Close()
+	defer compressedFile.Close()
 
 	// Read the compression algorithm
-	algorithm, err := readAlgorithm(decompressedFile)
+	algorithm, err := readAlgorithm(compressedFile)
 	if err != nil {
 		return outputFiles, err
 	}
@@ -220,7 +220,7 @@ func Decompress(compressedFilePath, outputDir, password string) ([]string, error
 	}
 
 	// Decompress the file
-	fileNames, err := WriteAndDecompressFiles(decompressedFile, outputDir, algorithm)
+	fileNames, err := WriteAndDecompressFiles(compressedFile, outputDir, algorithm)
 	if err != nil {
 		return outputFiles, err
 	}
