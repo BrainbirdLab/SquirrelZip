@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"io"
+	"file-compressor/constants"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,4 +140,11 @@ func InvalidateFileName(filename string, outputDir string) string {
 		count++
 	}
 	return finalFile
+}
+
+func SafeDeleteFile(filePath string) {
+	err := os.Remove(filePath)
+	if err != nil {
+		ColorPrint(RED, fmt.Sprintf(constants.FILE_REMOVE_ERROR, err.Error()) + "\n")
+	}
 }

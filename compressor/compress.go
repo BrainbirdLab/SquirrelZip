@@ -60,21 +60,20 @@ func Compress(filenameStrs []string, outputDir, password, algorithm string) (str
 	fileName := filenameStrs[0]
 	ext := filepath.Ext(fileName)
 	fileName = strings.TrimSuffix(fileName, ext)
-	fileName = fmt.Sprintf("%s.sq", fileName) // use the first filename as default output filename
 	fileName = utils.InvalidateFileName(fileName, outputDir)
-	// Create a writer to write the compressed data
-	outputFile, err := os.Create(fileName)
+
+	compressedFile, err := os.Create(fileName)
 	if err != nil {
 		return "", fileMeta, fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
-
 	
-	originalSize, err := ReadAndCompressFiles(filenameStrs, outputFile, algorithm)
+	defer compressedFile.Close()
+
+	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFile, algorithm)
 	if err != nil {
 		return "", fileMeta, err
 	}
 
-	outputFile.Close()
 	compressedStat, err := os.Stat(fileName)
 	if err != nil {
 		return "", fileMeta, fmt.Errorf(constants.FILE_STAT_ERROR, err)
@@ -187,23 +186,22 @@ returns the list of decompressed files and an error if any
 */
 func Decompress(compressedFilePath, outputDir, password string) ([]string, error) {
 
+	outputFiles := make([]string, 0)
 	// check if the compressed file exists
 	if _, err := os.Stat(compressedFilePath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("compressed file '%s' does not exist", compressedFilePath)
 	}
 
-	outputFiles := make([]string, 0)
-
-	// Open the compressed file
-	compressedFile, err := os.Open(compressedFilePath)
+	// decrypt the compressed file first
+	decompressedFile, err := os.Create(compressedFilePath)
 	if err != nil {
-		return nil, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
+		return nil, fmt.Errorf(constants.FILE_CREATE_ERROR, err)
 	}
 
-	defer compressedFile.Close()
+	defer decompressedFile.Close()
 
 	// Read the compression algorithm
-	algorithm, err := readAlgorithm(compressedFile)
+	algorithm, err := readAlgorithm(decompressedFile)
 	if err != nil {
 		return outputFiles, err
 	}
@@ -222,7 +220,7 @@ func Decompress(compressedFilePath, outputDir, password string) ([]string, error
 	}
 
 	// Decompress the file
-	fileNames, err := WriteAndDecompressFiles(compressedFile, outputDir, algorithm)
+	fileNames, err := WriteAndDecompressFiles(decompressedFile, outputDir, algorithm)
 	if err != nil {
 		return outputFiles, err
 	}

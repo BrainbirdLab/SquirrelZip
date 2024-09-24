@@ -17,8 +17,6 @@ func DecompressData(compressed []byte) ([]byte, error) {
 			return nil, fmt.Errorf("failed to read flag byte: %v", err)
 		}
 
-		fmt.Printf("Flag: %d\n", flag) // Debugging: print the flag
-
 		switch flag {
 		case 0:
 			err := handleLiteral(reader, &uncompressed)
