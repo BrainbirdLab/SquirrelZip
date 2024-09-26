@@ -6,6 +6,8 @@ const (
 	NO_PASSWORD byte = 43
 	PASSWORD    byte = 57
 
+	COMPRESSED_FILE_EXT = ".compressed"
+
 	FILE_CREATE_ERROR = "failed to create file: %v"
 	FILE_WRITE_ERROR = "failed to write file: %v"
 	FILE_READ_ERROR = "failed to read file: %v"

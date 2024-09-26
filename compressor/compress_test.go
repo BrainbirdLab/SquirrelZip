@@ -7,11 +7,10 @@ import (
 )
 
 func TestCompress(t *testing.T) {
-	Init("huffman", t)
-	//Init("arithmetic", t)
+	DecompressStart(Init("huffman", t), t)
 }
 
-func Init(algo string, t *testing.T) {
+func Init(algo string, t *testing.T) string {
 	testFilesDir := "test_files/input"
 	testFiles, err := os.ReadDir(testFilesDir)
 	if err != nil {
@@ -24,11 +23,34 @@ func Init(algo string, t *testing.T) {
 	}
 
 	outputDir := "test_files/compress_output"
-	_, fileMeta, err := Compress(fileNameStrs, outputDir, algo)
+	outputPath, fileMeta, err := Compress(fileNameStrs, outputDir, algo)
 	if err != nil {
 		t.Fatalf("failed to compress files: %v", err)
 	}
 
 	fileMeta.PrintFileInfo()
 	fileMeta.PrintCompressionRatio()
+
+	fmt.Println("Compression done: ", outputPath)
+
+	return outputPath
+}
+
+func DecompressStart(compressedPath string, t *testing.T) {
+	fmt.Printf("Decompressing file: %s\n", compressedPath)
+	_, err := Decompress(compressedPath, "test_files/decompressed_output")
+	if err != nil {
+		t.Fatalf("failed to decompress files: %v", err)
+	}
+
+	fmt.Println("Decompression done")
+	// delete compressed file and decompressed files
+	err = os.RemoveAll("test_files/compress_output")
+	if err != nil {
+		t.Fatalf("failed to delete compressed file: %v", err)
+	}
+	err = os.RemoveAll("test_files/decompressed_output")
+	if err != nil {
+		t.Fatalf("failed to delete decompressed files: %v", err)
+	}
 }

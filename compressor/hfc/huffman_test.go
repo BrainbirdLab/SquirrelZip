@@ -3,10 +3,10 @@ package hfc
 import (
 	"bytes"
 	"file-compressor/utils"
-	"path"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -28,7 +28,7 @@ func TestCompressedData(t *testing.T) {
 
 	codes, err := GetHuffmanCodes(&freq)
 	if err != nil {
-		t.Fatalf("failed to build huffman codes: %v", err)
+		t.Fatalf("failed to build huffman codes in compressed data: %v", err)
 	}
 
 	_, err = compressData(file, output, codes)
@@ -67,6 +67,43 @@ func TestSmallString(t *testing.T) {
 	}
 }
 
+func TestBigCode(t *testing.T) {
+	testData := []byte("hello. lorem ipsum dolor sit amet, consectetur adipiscing elit. sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. 😓🥲🐥🤲🐟😀📖💙🍂😃🐥🐥😓")
+	freq := make(map[rune]int)
+	err := getFrequencyMap(bytes.NewReader(testData), &freq)
+	if err != nil {
+		t.Fatalf("failed to get frequency map: %v", err)
+	}
+	codes, err := GetHuffmanCodes(&freq)
+	if err != nil {
+		t.Fatalf("failed to build huffman codes: %v", err)
+	}
+
+	compressedBytes := []byte{}
+	compressedBuffer := bytes.NewBuffer(compressedBytes)
+
+	//compress
+	compLen, err := compressData(bytes.NewReader(testData), compressedBuffer, codes)
+	if err != nil {
+		t.Fatalf("failed to compress: %v", err)
+	}
+
+	//decompress
+	decompressedBytes := []byte{}
+	decompressedBuffer := bytes.NewBuffer(decompressedBytes)
+
+	err = decompressData(compressedBuffer, decompressedBuffer, codes, compLen)
+	if err != nil {
+		t.Fatalf("failed to decompress: %v", err)
+	}
+
+	//compare original and decompressed data
+	if bytes.Equal(testData, decompressedBuffer.Bytes()) == false {
+		t.Fatal("data do not match")
+	}
+
+}
+
 func TestBitEncoding(t *testing.T) {
 
 	err := CheckString(t, []byte("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."))
@@ -89,8 +126,6 @@ func TestBitEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-
 
 func CheckString(t *testing.T, testData []byte) error {
 
@@ -130,7 +165,7 @@ func CheckString(t *testing.T, testData []byte) error {
 	//decompress
 	decompressedBytes := []byte{}
 	decompressedBuffer := bytes.NewBuffer(decompressedBytes)
-	
+
 	err = decompressData(compressedBuffer, decompressedBuffer, codes, compLen)
 	if err != nil {
 		t.Fatalf("failed to decompress: %v", err)
@@ -143,7 +178,6 @@ func CheckString(t *testing.T, testData []byte) error {
 
 	return nil
 }
-
 
 func TestFile(t *testing.T) {
 	RunFile("input/example.txt", t)
@@ -170,7 +204,7 @@ func RunFile(targetPath string, t *testing.T) {
 
 	defer inputFile.Close()
 
-	compressedFileName := path.Join(tempCompressPath, "compressed")
+	compressedFileName := filepath.Join(tempCompressPath, "compressed")
 
 	compressedFile, err := os.Create(compressedFileName)
 	if err != nil {
@@ -178,11 +212,11 @@ func RunFile(targetPath string, t *testing.T) {
 	}
 
 	inputFileData := utils.FileData{
-		Name: targetPath,
-		Size: targetStat.Size(),
+		Name:   targetPath,
+		Size:   targetStat.Size(),
 		Reader: inputFile,
 	}
-	
+
 	// Compress
 	err = Zip([]utils.FileData{inputFileData}, compressedFile)
 	if err != nil {
@@ -202,30 +236,29 @@ func RunFile(targetPath string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get compressed file info: %v", err)
 	}
-	
+
 	fileInfo := utils.NewFilesRatio(uint64(inputSize), uint64(stat.Size()))
 	fileInfo.PrintFileInfo()
 
 	// seek to start
 	compressedFile.Seek(0, io.SeekStart)
-	
+
 	// Decompress
 	fileNames, err := Unzip(compressedFile, "decompress_output")
 	if err != nil {
 		t.Fatalf("failed to decompress file: %v", err)
 	}
-	
+
 	if len(fileNames) != 1 {
 		t.Fatalf("failed to decompress file: %v", err)
 	}
-	
+
 	fileInfo.PrintCompressionRatio()
 	//compare original and decompressed data
 	compareFiles(targetPath, fileNames[0], t)
 	//remove temp files
 	//os.Remove(tempCompressPath)
 }
-
 
 func compareFiles(file1, file2 string, t *testing.T) {
 	//compare original and decompressed files data
@@ -238,7 +271,7 @@ func compareFiles(file1, file2 string, t *testing.T) {
 	decompressedFile, err := os.Open(file2)
 	if err != nil {
 		t.Fatalf("failed to open decompressed file: %v", err)
-	}	
+	}
 	defer decompressedFile.Close()
 
 	originalReader := io.Reader(originalFile)

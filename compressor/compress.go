@@ -60,16 +60,17 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 	fileName := filenameStrs[0]
 	ext := filepath.Ext(fileName)
 	fileName = strings.TrimSuffix(fileName, ext)
+	fileName = filepath.Base(fileName) + constants.COMPRESSED_FILE_EXT
 	fileName = utils.InvalidateFileName(fileName, outputDir)
 
-	compressedFile, err := os.Create(fileName)
+	compressedFileOutput, err := os.Create(fileName)
 	if err != nil {
 		return "", fileMeta, fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
 	
-	defer compressedFile.Close()
+	defer compressedFileOutput.Close()
 
-	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFile, algorithm)
+	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFileOutput, algorithm)
 	if err != nil {
 		return "", fileMeta, err
 	}
@@ -99,8 +100,6 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 		if err != nil {
 			return 0, fmt.Errorf("failed to get file info: %v", err)
 		}
-
-		fmt.Printf("File info: %s, size: %d\n", filenameStr, fileInfo.Size())
 
 		originalSize += uint64(fileInfo.Size())
 

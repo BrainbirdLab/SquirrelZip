@@ -7,13 +7,16 @@ import (
 	"file-compressor/utils"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
+
 
 func handleDecompress(fileName, outputDir, password string) {
 	encryptedFile, err := os.Open(fileName)
 	if err != nil {
-		utils.ColorPrint(utils.RED, constants.FILE_OPEN_ERROR + err.Error() + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_OPEN_ERROR, err.Error()))
 		os.Exit(-1)
 	}
 
@@ -22,13 +25,13 @@ func handleDecompress(fileName, outputDir, password string) {
 	decryptedFilePath := fileName + ".decrypted"
 	decryptedFile, err := os.Create(decryptedFilePath)
 	if err != nil {
-		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_CREATE_ERROR, err.Error()) + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_CREATE_ERROR, err.Error())+"\n")
 		os.Exit(-1)
 	}
 
 	err = encryption.DecryptStream(encryptedFile, decryptedFile, password)
 	if err != nil {
-		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FAILED_TO_DECRYPT, err.Error()) + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FAILED_TO_DECRYPT, err.Error())+"\n")
 		//release file
 		decryptedFile.Close()
 		// delete the decrypted file
@@ -38,11 +41,11 @@ func handleDecompress(fileName, outputDir, password string) {
 
 	decryptedFile.Close()
 
-	utils.ColorPrint(utils.GREEN, "Decrypted file: " + decryptedFilePath + "\n")
+	utils.ColorPrint(utils.GREEN, "Decrypted file: "+decryptedFilePath+"\n")
 
 	paths, err := compressor.Decompress(decryptedFilePath, outputDir)
 	if err != nil {
-		utils.ColorPrint(utils.RED, err.Error() + "\n")
+		utils.ColorPrint(utils.RED, err.Error()+"\n")
 		// delete the decrypted file
 		//utils.SafeDeleteFile(decryptedFilePath)
 		os.Exit(-1)
@@ -52,14 +55,14 @@ func handleDecompress(fileName, outputDir, password string) {
 	utils.SafeDeleteFile(decryptedFilePath)
 
 	for _, path := range paths {
-		utils.ColorPrint(utils.GREEN, "Decompressed file: " + path + "\n")
+		utils.ColorPrint(utils.GREEN, "Decompressed file: "+path+"\n")
 	}
 }
 
 func handleCompress(fileNames []string, outputDir, password, algorithm string) {
 	outputPath, fileMeta, err := compressor.Compress(fileNames, outputDir, algorithm)
 	if err != nil {
-		utils.ColorPrint(utils.RED, err.Error() + "\n")
+		utils.ColorPrint(utils.RED, err.Error()+"\n")
 		utils.SafeDeleteFile(outputPath)
 		os.Exit(-1)
 	}
@@ -67,44 +70,51 @@ func handleCompress(fileNames []string, outputDir, password, algorithm string) {
 	fileMeta.PrintFileInfo()
 	fileMeta.PrintCompressionRatio()
 
-	utils.ColorPrint(utils.GREEN, "Compressed file: " + outputPath + "\n")
-	
+	utils.ColorPrint(utils.GREEN, "Compressed file: "+outputPath+"\n")
+
 	compressedFile, err := os.Open(outputPath)
 	if err != nil {
-		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_OPEN_ERROR, err.Error()) + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_OPEN_ERROR, err.Error())+"\n")
 		os.Exit(-1)
 	}
 
-	fileToWrite, err := os.Create(outputPath + ".sq")
+	fileName := outputPath
+	fileExt := filepath.Ext(fileName)
+	fileName = strings.TrimSuffix(fileName, fileExt)
+
+	finalFileName := utils.InvalidateFileName(fileName+".sq", "")
+
+	finalFile, err := os.Create(finalFileName)
 	if err != nil {
-		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_CREATE_ERROR, err.Error()) + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_CREATE_ERROR, err.Error())+"\n")
 		//release file
 		compressedFile.Close()
 		utils.SafeDeleteFile(outputPath)
 		os.Exit(-1)
 	}
 
-	err = encryption.EncryptStream(compressedFile, fileToWrite, password)
+	err = encryption.EncryptStream(compressedFile, finalFile, password)
 	if err != nil {
-		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FAILED_TO_ENCRYPT, err.Error()) + "\n")
+		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FAILED_TO_ENCRYPT, err.Error())+"\n")
 		//release file
 		compressedFile.Close()
-		fileToWrite.Close()
+		finalFile.Close()
 		utils.SafeDeleteFile(outputPath)
-		utils.SafeDeleteFile(outputPath + ".sq")
+		utils.SafeDeleteFile(finalFileName)
 		os.Exit(-1)
 	}
 
-	utils.ColorPrint(utils.GREEN, "Encrypted file: " + outputPath + ".sq\n")
+	utils.ColorPrint(utils.GREEN, "Encrypted file: "+finalFileName+"\n")
 
 	compressedFile.Close()
 	// delete the compressed file
 	utils.SafeDeleteFile(outputPath)
 }
 
+
 func main() {
 
-	startTime :=  time.Now()
+	startTime := time.Now()
 
 	//cli arguments
 	filenameStrs, outputDir, password, mode, algorithm := utils.ParseCLI()
@@ -116,7 +126,5 @@ func main() {
 	}
 
 	endTime := time.Now()
-	utils.ColorPrint(utils.GREEN, "Time taken: " + utils.TimeTrack(startTime, endTime) + "\n")
+	utils.ColorPrint(utils.GREEN, "Time taken: "+utils.TimeTrack(startTime, endTime)+"\n")
 }
-
-

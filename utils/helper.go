@@ -50,7 +50,7 @@ func ColorPrint(color COLOR, message string) {
 
 func MakeOutputDir(outputDir string) error {
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-		err := os.Mkdir(outputDir, 0777)
+		err := os.MkdirAll(outputDir, 0777)
 		if err != nil {
 			return fmt.Errorf("failed to create output directory: %v", err)
 		}
@@ -120,20 +120,20 @@ func (f *FilesRatio) PrintCompressionRatio() {
 	fmt.Printf("Compression ratio: %.2f%%\n", compressionRatio)
 }
 
-func InvalidateFileName(filename string, outputDir string) string {
-	fileExt := filepath.Ext(filename)
-	//extract the file name without the extension
-	filename = filepath.Base(filename)
-	originalName := strings.TrimSuffix(filename, fileExt)
+func InvalidateFileName(fileBase string, outputDir string) string {
+	fileDir := filepath.Dir(fileBase)
+	fileExt := filepath.Ext(fileBase)
+	fileBase = filepath.Base(fileBase)
+	originalName := strings.TrimSuffix(fileBase, fileExt)
 
-	finalFile := filepath.Join(outputDir, originalName + fileExt)
+	finalFile := filepath.Join(outputDir, fileDir, originalName + fileExt)
 
 	count := 1
 	for {
 		//if file already exists, add a number to the filename before the extension and check again
 		if _, err := os.Stat(finalFile); err == nil {
-			filename = fmt.Sprintf("%s_%d", originalName, count)
-			finalFile = filepath.Join(outputDir, filename + fileExt)
+			fileBase = fmt.Sprintf("%s_%d", originalName, count)
+			finalFile = filepath.Join(outputDir, fileDir, fileBase + fileExt)
 		} else {
 			break
 		}

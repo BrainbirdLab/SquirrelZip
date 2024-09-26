@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 
 	"file-compressor/constants"
 	"file-compressor/utils"
@@ -426,7 +426,7 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 }
 
 // Zip compresses data using Huffman coding and writes the compressed data to the output stream.
-func Zip(files []utils.FileData, output io.Writer) (error) {
+func Zip(files []utils.FileData, output io.Writer) error {
 
 	codes, err := generateCodes(&files, output)
 	if err != nil {
@@ -437,7 +437,6 @@ func Zip(files []utils.FileData, output io.Writer) (error) {
 	if err := writeNumOfFiles(uint64(len(files)), output); err != nil {
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
-
 
 	for _, file := range files {
 		reader := file.Reader
@@ -608,9 +607,9 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 			return nil, err
 		}
 
-		fileName = path.Join(outputPath, fileName)
+		fileName = filepath.Join(outputPath, fileName)
 
-		dir := path.Dir(fileName)
+		dir := filepath.Dir(fileName)
 
 		if err := utils.MakeOutputDir(dir); err != nil {
 			return nil, fmt.Errorf(constants.ERROR_CREATE_DIR, err)
