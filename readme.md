@@ -10,7 +10,7 @@ Simple CLI tool for compressing and decompressing files.
 
 ### Run
 
-./sq -c <file1,file2> -o <outputDir>
+```./sq -c <file1,file2> -o <outputDir>```
 
   -v      Print version information
   -c      Input files or directory to be compressed [strings] (Space separated)
@@ -25,19 +25,19 @@ Simple CLI tool for compressing and decompressing files.
 
 ### Compress
 #### Compress without password:
-./sq -c file.txt file2.txt
+```./sq -c file.txt file2.txt```
 
 #### Compress with password:
-./sq -c file.txt file2.txt -p mySecurepass1234
+```./sq -c file.txt file2.txt -p mySecurepass1234```
 
 #### Or compress the whole directory:
-./sq -all folder
+```./sq -all folder```
 
 #### To provide an output path use the `-o` flag:
-./sq -c file.txt -o output/files
+```./sq -c file.txt -o output/files```
 
 ### Decompress without password:
-./sq -d compressed.sq
+```./sq -d compressed.sq```
 
 ### Decompress with password:
-./sq -d compressed.sq -p mySecurepass1234
+```./sq -d compressed.sq -p mySecurepass1234```
