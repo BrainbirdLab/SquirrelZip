@@ -99,6 +99,8 @@ func TestBigCode(t *testing.T) {
 
 	//compare original and decompressed data
 	if bytes.Equal(testData, decompressedBuffer.Bytes()) == false {
+		fmt.Printf("original: %s\n", testData)
+		fmt.Printf("decompressed: %s\n", decompressedBuffer.Bytes())
 		t.Fatal("data do not match")
 	}
 
@@ -173,6 +175,8 @@ func CheckString(t *testing.T, testData []byte) error {
 
 	//compare original and decompressed data
 	if bytes.Equal(testData, decompressedBuffer.Bytes()) == false {
+		fmt.Printf("original: %s\n", testData)
+		fmt.Printf("decompressed: %s\n", decompressedBuffer.Bytes())
 		t.Fatal("original and decompressed data do not match")
 	}
 

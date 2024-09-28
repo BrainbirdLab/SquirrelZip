@@ -295,6 +295,10 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 		remainingBitsLen++
 	}
 
+	if remainingBitsLen == 0 {
+		return nil
+	}
+
 	currentNode := root
 
 	for i := int(remainingBitsLen - 1); i >= 0; i-- {
