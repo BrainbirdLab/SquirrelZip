@@ -204,6 +204,48 @@ func TestSpecialCharacters(t *testing.T) {
 	}
 }
 
+func TestLargeFile(t *testing.T) {
+	file, err := os.Open("example.txt")
+	if err != nil {
+		PrintError(t, constants.FILE_OPEN_ERROR, err)
+	}
+	defer file.Close()
+
+	freq := make(map[rune]int)
+	if err := getFrequencyMap(file, &freq); err != nil {
+		PrintError(t, constants.FAILED_GET_FREQ_MAP, err)
+	}
+
+	codes, err := GetHuffmanCodes(&freq)
+	if err != nil {
+		PrintError(t, constants.FAILED_BUILD_HUFFMAN_CODES, err)
+	}
+
+	file, err = os.Create("large_file_huffman_codes.txt")
+	if err != nil {
+		PrintError(t, constants.FILE_CREATE_ERROR, err)
+	}
+
+	if err := WriteHuffmanCodes(file, codes); err != nil {
+		PrintError(t, constants.FAILED_WRITE_HUFFMAN_CODES, err)
+	}
+
+	file.Seek(0, io.SeekStart)
+
+	codes2, err := ReadHuffmanCodes(file)
+	if err != nil {
+		PrintError(t, constants.FAILED_READ_HUFFMAN_CODES, err)
+	}
+
+	compareHuffmanCodes(t, codes, codes2)
+
+	file.Close()
+	//remove the file
+	if err := os.Remove("large_file_huffman_codes.txt"); err != nil {
+		PrintError(t, constants.FILE_REMOVE_ERROR, err)
+	}
+}
+
 func compareHuffmanCodes(t *testing.T, codes1, codes2 map[rune]string) {
 	if len(codes1) != len(codes2) {
 		t.Fatalf("code lengths do not match: %d vs %d", len(codes1), len(codes2))

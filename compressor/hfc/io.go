@@ -35,13 +35,15 @@ func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
 
 func WriteHuffmanCodes(file io.Writer, codes map[rune]string) error {
 	//write the number of codes
-	binary.Write(file, binary.LittleEndian, uint32(len(codes)))
+	binary.Write(file, binary.LittleEndian, uint64(len(codes)))
 
 	for k, v := range codes {
 		//write the rune
 		binary.Write(file, binary.LittleEndian, uint32(k))
 		//write the length of the code
-		binary.Write(file, binary.LittleEndian, byte(len(v))) // bit length of the code
+		// codelen must be a multiple of 8, if not round it up to the nearest higher multiple of 8
+		codeLen := len(v)
+		binary.Write(file, binary.LittleEndian, uint8(codeLen)) // bit length of the code
 		//write the code
 		completeByte := byte(0)
 		completeByteIndex := 0
@@ -70,13 +72,13 @@ func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 	codes := make(map[rune]string)
 
 	// Read the number of codes (4 bytes, uint32)
-	var numCodes uint32
+	var numCodes uint64
 	if err := binary.Read(file, binary.LittleEndian, &numCodes); err != nil {
 		return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
 	// Read each code
-	for i := uint32(0); i < numCodes; i++ {
+	for i := uint64(0); i < numCodes; i++ {
 		// Read the rune
 		var r uint32
 		if err := binary.Read(file, binary.LittleEndian, &r); err != nil {
@@ -84,13 +86,13 @@ func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 		}
 
 		// Read the length of the Huffman code (1 byte)
-		var codeLen byte
+		var codeLen uint8
 		if err := binary.Read(file, binary.LittleEndian, &codeLen); err != nil {
 			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
 
 		// Read the code bits (packed into bytes)
-		codeBits := make([]byte, (codeLen+7)/8) // (codeLen+7)/8 ensures enough space to hold all bits
+		codeBits := make([]byte, int((codeLen+7)/8)) // (codeLen+7)/8 ensures enough space to hold all bits
 		if _, err := file.Read(codeBits); err != nil {
 			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
