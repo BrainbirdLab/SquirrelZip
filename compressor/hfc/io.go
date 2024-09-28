@@ -412,11 +412,8 @@ func writeFileName(fileName string, output io.Writer, codes map[rune]string) err
 	if err != nil {
 		return fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
-
-	fmt.Printf("Compressed file name length: %d, of original filename: %s\n", compLen, fileName)
-
 	// write length of the file name buffer
-	if err := binary.Write(output, binary.LittleEndian, uint16(compressedNameBuf.Len())); err != nil {
+	if err := binary.Write(output, binary.LittleEndian, uint16(compLen)); err != nil {
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
