@@ -188,6 +188,45 @@ func TestFile(t *testing.T) {
 	//RunFile("image.JPG", t)
 }
 
+func TestRebuildHuffmanTree(t *testing.T) {
+	codes := map[rune]string{
+		'a': "0",
+		'b': "101",
+		'c': "100",
+		'd': "111",
+		'e': "1101",
+		'f': "1100",
+	}
+
+	root := rebuildHuffmanTree(codes)
+
+	tests := []struct {
+		char  rune
+		code  string
+	}{
+		{'a', "0"},
+		{'b', "101"},
+		{'c', "100"},
+		{'d', "111"},
+		{'e', "1101"},
+		{'f', "1100"},
+	}
+
+	for _, test := range tests {
+		node := root
+		for _, bit := range test.code {
+			if bit == '0' {
+				node = node.left
+			} else {
+				node = node.right
+			}
+		}
+		if node == nil || node.char != test.char {
+			t.Fatalf("expected character %c for code %s, but got %c", test.char, test.code, node.char)
+		}
+	}
+}
+
 func RunFile(targetPath string, t *testing.T) {
 
 	tempCompressPath := "compress_output"

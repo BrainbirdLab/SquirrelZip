@@ -20,7 +20,6 @@ func compressLZ77(r io.Reader, w io.Writer) error {
 	var slidingWindow []byte
 
 	for {
-		// Read the next chunk
 		n, err := r.Read(buffer)
 		if n == 0 {
 			break
@@ -31,47 +30,61 @@ func compressLZ77(r io.Reader, w io.Writer) error {
 		}
 
 		inputBytes := buffer[:n]
-
-		// Process each byte in the chunk
-		for i := 0; i < len(inputBytes); {
-			start := i - len(slidingWindow)
-			if start < 0 {
-				start = 0
-			}
-			window := slidingWindow[start:]
-
-			// Find the longest match in the window
-			var longestOffset, longestLength int16
-			for j := 0; j < len(window); j++ {
-				length := 0
-				for length < len(window)-j && i+length < len(inputBytes) && window[j+length] == inputBytes[i+length] {
-					length++
-				}
-				if length > int(longestLength) {
-					longestOffset = int16(len(window) - j)
-					longestLength = int16(length)
-				}
-			}
-
-			nextChar := byte(0)
-			if i+int(longestLength) < len(inputBytes) {
-				nextChar = inputBytes[i+int(longestLength)]
-			}
-
-			// Write the token to io.Writer
-			binary.Write(w, binary.LittleEndian, Token{Offset: longestOffset, Length: longestLength, Char: nextChar})
-
-			// Add processed data to sliding window
-			slidingWindow = append(slidingWindow, inputBytes[i:i+int(longestLength)+1]...)
-			if len(slidingWindow) > windowSize {
-				slidingWindow = slidingWindow[len(slidingWindow)-windowSize:]
-			}
-
-			i += int(longestLength) + 1
-		}
+		processChunk(inputBytes, &slidingWindow, w)
 	}
 
 	return nil
+}
+
+func processChunk(inputBytes []byte, slidingWindow *[]byte, w io.Writer) {
+	for i := 0; i < len(inputBytes); {
+		window := getWindow(*slidingWindow, i)
+		longestOffset, longestLength := findLongestMatch(window, inputBytes[i:])
+		nextChar := getNextChar(inputBytes, i, longestLength)
+
+		binary.Write(w, binary.LittleEndian, Token{Offset: longestOffset, Length: longestLength, Char: nextChar})
+
+		*slidingWindow = updateSlidingWindow(*slidingWindow, inputBytes[i:i+int(longestLength)+1])
+		i += int(longestLength) + 1
+	}
+}
+
+func getWindow(slidingWindow []byte, i int) []byte {
+	start := i - len(slidingWindow)
+	if start < 0 {
+		start = 0
+	}
+	return slidingWindow[start:]
+}
+
+func findLongestMatch(window, inputBytes []byte) (int16, int16) {
+	var longestOffset, longestLength int16
+	for j := 0; j < len(window); j++ {
+		length := 0
+		for length < len(window)-j && length < len(inputBytes) && window[j+length] == inputBytes[length] {
+			length++
+		}
+		if length > int(longestLength) {
+			longestOffset = int16(len(window) - j)
+			longestLength = int16(length)
+		}
+	}
+	return longestOffset, longestLength
+}
+
+func getNextChar(inputBytes []byte, i int, longestLength int16) byte {
+	if i+int(longestLength) < len(inputBytes) {
+		return inputBytes[i+int(longestLength)]
+	}
+	return 0
+}
+
+func updateSlidingWindow(slidingWindow, newBytes []byte) []byte {
+	slidingWindow = append(slidingWindow, newBytes...)
+	if len(slidingWindow) > windowSize {
+		slidingWindow = slidingWindow[len(slidingWindow)-windowSize:]
+	}
+	return slidingWindow
 }
 
 // LZ77 decompression function using io.Reader and io.Writer
