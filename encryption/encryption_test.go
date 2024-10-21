@@ -81,7 +81,7 @@ func TestDecryptInvalidData(t *testing.T) {
 
 	err = DecryptStream(encryptedReader, decryptedData, "")
 	if err == nil {
-		t.Fatalf(DECRYPT_SHOULD_FAIL)
+		t.Fatal(DECRYPT_SHOULD_FAIL)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestDecryptInvalidPassword(t *testing.T) {
 
 	err = DecryptStream(encryptedReader, decryptedData, "invalid")
 	if err == nil {
-		t.Fatalf(DECRYPT_SHOULD_FAIL)
+		t.Fatal(DECRYPT_SHOULD_FAIL)
 	}
 
 	fmt.Printf("Error successfully caught: %v\n", err)
@@ -123,7 +123,7 @@ func TestEncryptWithPassDecryptWithNoPass(t *testing.T) {
 
 	err = DecryptStream(encryptedReader, decryptedData, "")
 	if err == nil {
-		t.Fatalf(DECRYPT_SHOULD_FAIL)
+		t.Fatal(DECRYPT_SHOULD_FAIL)
 	}
 
 	fmt.Printf("Error successfully caught: %v\n", err)

@@ -14,6 +14,15 @@ import (
 )
 
 
+// getFrequencyMap reads data from the provided io.Reader and populates the given frequency map
+// with the count of each rune encountered in the input.
+//
+// Parameters:
+//   - input: an io.Reader from which data is read.
+//   - freq: a pointer to a map where the frequency of each rune will be stored.
+//
+// Returns:
+//   - error: an error if reading from the input fails, otherwise nil.
 func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
 	buf := make([]byte, constants.BUFFER_SIZE)
 	for {
@@ -33,6 +42,17 @@ func getFrequencyMap(input io.Reader, freq *map[rune]int) error {
 	return nil
 }
 
+// WriteHuffmanCodes writes Huffman codes to the provided io.Writer.
+// It first writes the number of codes, followed by each rune and its corresponding code.
+// Each code is written as a sequence of bytes, with the length of the code being a multiple of 8 bits.
+// If the length of the code is not a multiple of 8, it is rounded up to the nearest higher multiple of 8.
+//
+// Parameters:
+//   - file: An io.Writer where the Huffman codes will be written.
+//   - codes: A map where the keys are runes and the values are their corresponding Huffman codes as strings.
+//
+// Returns:
+//   - error: An error if any occurs during writing, otherwise nil.
 func WriteHuffmanCodes(file io.Writer, codes map[rune]string) error {
 	//write the number of codes
 	binary.Write(file, binary.LittleEndian, uint64(len(codes)))
@@ -68,6 +88,21 @@ func WriteHuffmanCodes(file io.Writer, codes map[rune]string) error {
 	return nil
 }
 
+// ReadHuffmanCodes reads Huffman codes from the provided io.Reader and returns a map
+// where the keys are runes and the values are their corresponding Huffman codes as strings.
+// The function expects the input to be in a specific binary format:
+// - The first 4 bytes represent the number of Huffman codes (uint32).
+// - For each Huffman code:
+//   - The next 4 bytes represent the rune (uint32).
+//   - The next byte represents the length of the Huffman code (uint8).
+//   - The subsequent bytes contain the Huffman code bits, packed into bytes.
+//
+// Parameters:
+// - file: An io.Reader from which the Huffman codes will be read.
+//
+// Returns:
+// - A map[rune]string where each rune is mapped to its corresponding Huffman code.
+// - An error if there is an issue reading from the file or if the data is in an unexpected format.
 func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 	codes := make(map[rune]string)
 
@@ -116,6 +151,22 @@ func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 	return codes, nil
 }
 
+// compressData compresses data from the input reader and writes the compressed data to the output writer
+// using the provided Huffman codes.
+//
+// Parameters:
+//   - input: An io.Reader from which the data to be compressed is read.
+//   - output: An io.Writer to which the compressed data is written.
+//   - codes: A map of runes to their corresponding Huffman codes.
+//
+// Returns:
+//   - uint64: The length of the compressed data in bytes.
+//   - error: An error if any occurs during the compression process.
+//
+// The function reads data from the input in chunks, processes each chunk to compress it using the provided
+// Huffman codes, and writes the compressed data to the output. It handles padding of the last byte and writes
+// the number of bits used in the last byte to the output. If an error occurs during reading, processing, or
+// writing, the function returns the error.
 func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uint64, error) {
 	var currentByte byte
 	var bitCount uint8
@@ -157,6 +208,22 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 	return compressedLength, nil
 }
 
+// processByte processes a buffer of bytes, compressing it using Huffman codes and writing the result to an output writer.
+// 
+// Parameters:
+//   - buf: A slice of bytes to be processed.
+//   - output: An io.Writer where the compressed data will be written.
+//   - codes: A map of runes to their corresponding Huffman codes as strings.
+//   - currentByte: A pointer to the current byte being constructed from the Huffman codes.
+//   - bitCount: A pointer to the count of bits currently in the current byte.
+//   - compressedLength: A pointer to the total length of the compressed data.
+//
+// Returns:
+//   - error: An error if there is no Huffman code for a character in the buffer or if there is an issue writing to the output.
+//
+// The function iterates over each byte in the buffer, looks up its corresponding Huffman code, and writes the bits of the code
+// to the current byte. When the current byte is full (i.e., 8 bits), it writes the byte to the output and resets the current byte
+// and bit count. The compressed length is incremented each time a byte is written to the output.
 func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByte *byte, bitCount *uint8, compressedLength *uint64) error {
 
 	for _, b := range buf {
@@ -188,10 +255,21 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 	return nil
 }
 
+// decompressData decompresses data from the provided reader and writes the decompressed data to the provided writer.
+// It uses the provided Huffman codes to decode the data and respects the limiter for the maximum number of bytes to read.
+//
+// Parameters:
+//   - reader: An io.Reader from which compressed data is read.
+//   - writer: An io.Writer to which decompressed data is written.
+//   - codes: A map of Huffman codes used for decompression.
+//   - limiter: A uint64 value specifying the maximum number of bytes to read. If set to -1, there is no limit.
+//
+// Returns:
+//   - error: An error if decompression fails, otherwise nil.
 func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, limiter uint64) error {
 
-	lastByte := make([]byte, 1)
-	lastByteCount := make([]byte, 1)
+	lastByte := make([]byte, 1) // last byte read from the reader
+	lastByteCount := make([]byte, 1) // number of bits in the last byte
 
 	leftOverByte := uint32(0)
 	leftOverByteCount := uint8(0)
@@ -243,6 +321,18 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 	return nil
 }
 
+// adjustBuffer modifies the read buffer based on the loop flag and updates the last byte and its count.
+//
+// Parameters:
+// - loopFlag: An integer flag that determines if the buffer should be adjusted.
+// - n: A pointer to an integer that tracks the current position in the buffer.
+// - lastByte: A pointer to a byte slice that stores the last byte from the previous chunk.
+// - lastByteCount: A pointer to a byte slice that stores the bit count of the last byte from the previous chunk.
+// - readBuffer: A pointer to a byte slice that represents the current read buffer.
+//
+// If loopFlag is non-zero, the function increments the position by 2, appends the last byte and its count to the 
+// beginning of the read buffer, and then updates the last byte and its count based on the current position. 
+// Finally, it removes the last 2 bytes from the read buffer.
 func adjustBuffer(loopFlag int, n *int, lastByte *[]byte, lastByteCount *[]byte, readBuffer *[]byte) {
 	if loopFlag != 0 {
 		*n += 2
@@ -259,6 +349,20 @@ func adjustBuffer(loopFlag int, n *int, lastByte *[]byte, lastByteCount *[]byte,
 	*readBuffer = (*readBuffer)[:*n-2]
 }
 
+// decompressFullByte processes a buffer of bytes to decompress data using a Huffman tree.
+// It traverses the tree based on the bits of each byte in the buffer and writes the decompressed
+// characters to the provided writer.
+//
+// Parameters:
+// - readBuffer: A slice of bytes containing the compressed data.
+// - leftOverByte: A pointer to an uint32 that holds the leftover bits from the previous byte.
+// - leftOverByteCount: A pointer to an uint8 that counts the number of leftover bits.
+// - currentNode: A double pointer to the current node in the Huffman tree.
+// - root: A double pointer to the root node of the Huffman tree.
+// - writer: An io.Writer where the decompressed data will be written.
+//
+// Returns:
+// - error: An error if writing to the writer fails, otherwise nil.
 func decompressFullByte(readBuffer []byte, leftOverByte *uint32, leftOverByteCount *uint8, currentNode **Node, root **Node, writer io.Writer) error {
 	for _, b := range readBuffer {
 		for i := 7; i >= 0; i-- {
@@ -285,6 +389,19 @@ func decompressFullByte(readBuffer []byte, leftOverByte *uint32, leftOverByteCou
 	return nil
 }
 
+// decompressRemainingBits processes the remaining bits from the last byte of a compressed stream,
+// traversing the Huffman tree to decode the bits and write the corresponding characters to the output.
+//
+// Parameters:
+//   - remainingBits: The bits that are left to be processed.
+//   - remainingBitsLen: The length of the remaining bits.
+//   - numOfBits: The number of bits to process from the last byte.
+//   - lastByte: The last byte from the compressed stream.
+//   - output: The writer where the decompressed data will be written.
+//   - root: The root node of the Huffman tree.
+//
+// Returns:
+//   - error: An error if writing to the output fails, otherwise nil.
 func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOfBits uint8, lastByte byte, output io.Writer, root *Node) error {
 	// include the last byte in the remaining bits
 	for j := 7; j >= 8-int(numOfBits); j-- {
@@ -323,6 +440,17 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 }
 
 // Zip compresses data using Huffman coding and writes the compressed data to the output stream.
+// Zip compresses multiple files and writes the compressed data to the provided output writer.
+// It first generates compression codes for the files, writes the number of files, and then processes each file individually.
+// For each file, it compresses and writes the file name, writes a placeholder for the compressed size, compresses the file data,
+// and then updates the placeholder with the actual compressed size.
+//
+// Parameters:
+//   - files: A slice of utils.FileData representing the files to be compressed.
+//   - output: An io.Writer where the compressed data will be written.
+//
+// Returns:
+//   - error: An error if any step in the compression process fails.
 func Zip(files []utils.FileData, output io.Writer) error {
 
 	codes, err := generateCodes(&files, output)
@@ -372,6 +500,16 @@ func Zip(files []utils.FileData, output io.Writer) error {
 	return nil
 }
 
+// generateCodes generates Huffman codes for the given files and writes the frequency map and codes to the output.
+// It returns a map of runes to their corresponding Huffman codes.
+//
+// Parameters:
+// - files: A pointer to a slice of utils.FileData, where each FileData contains the file name and a reader for the file content.
+// - output: An io.Writer where the frequency map and Huffman codes will be written.
+//
+// Returns:
+// - A map[rune]string representing the Huffman codes for each rune.
+// - An error if there is any issue during the process of generating the frequency map, building Huffman codes, or writing the codes to the output.
 func generateCodes(files *[]utils.FileData, output io.Writer) (map[rune]string, error) {
 	freq := make(map[rune]int)
 	//first, we need to get the frequency map
@@ -473,7 +611,28 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 	return name, nil
 }
 
-// Unzip decompresses data using Huffman coding and writes the decompressed data to the output stream.
+
+// Unzip decompresses data from the provided io.Reader and writes the decompressed files to the specified output path.
+// If the output path is an empty string, the current directory is used.
+//
+// Parameters:
+//   - input: An io.Reader from which the compressed data is read.
+//   - outputPath: A string specifying the directory where the decompressed files will be written.
+//
+// Returns:
+//   - A slice of strings containing the paths of the decompressed files.
+//   - An error if any issue occurs during the decompression process.
+//
+// The function performs the following steps:
+//   1. Reads Huffman codes from the input.
+//   2. Reads the number of files to be decompressed.
+//   3. Iterates over each file, reading its name and creating the necessary directories.
+//   4. Creates the output file and reads its compressed size.
+//   5. Decompresses the data and writes it to the output file.
+//   6. Closes the output file and appends its path to the result slice.
+//
+// Possible errors include issues with reading Huffman codes, reading the number of files, creating directories, 
+// creating output files, reading compressed sizes, and decompressing data.
 func Unzip(input io.Reader, outputPath string) ([]string, error) {
 
 	if outputPath == "" {

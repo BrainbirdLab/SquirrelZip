@@ -53,6 +53,7 @@ func buildHuffmanTree(freq *map[rune]int) (*Node, error) {
 
 	heap.Init(&pq)
 
+	// put all nodes in the priority queue
 	for len(pq) > 1 {
 		left := heap.Pop(&pq).(*Node)
 		right := heap.Pop(&pq).(*Node)
@@ -63,6 +64,17 @@ func buildHuffmanTree(freq *map[rune]int) (*Node, error) {
 	return heap.Pop(&pq).(*Node), nil
 }
 
+
+// GetHuffmanCodes generates Huffman codes for the given frequency map of runes.
+// It builds a Huffman tree based on the frequencies and then traverses the tree
+// to generate the corresponding Huffman codes.
+//
+// Parameters:
+//   - freq: A pointer to a map where keys are runes and values are their frequencies.
+//
+// Returns:
+//   - A map where keys are runes and values are their corresponding Huffman codes.
+//   - An error if there is an issue building the Huffman tree.
 func GetHuffmanCodes(freq *map[rune]int) (map[rune]string, error) {
 
 	codes := make(map[rune]string)
@@ -77,7 +89,19 @@ func GetHuffmanCodes(freq *map[rune]int) (map[rune]string, error) {
 	return codes, nil
 }
 
-// huffmanBuilder builds Huffman codes for each character.
+
+// huffmanBuilder recursively builds the Huffman codes for each character in the input.
+// It traverses the Huffman tree and assigns binary codes to characters based on their position in the tree.
+//
+// Parameters:
+//   - node: A pointer to the current node in the Huffman tree.
+//   - prefix: The current binary prefix string representing the path taken to reach the node.
+//   - codes: A pointer to a map that stores the Huffman codes for each character.
+//   - frequency: A pointer to a map that stores the frequency of each character (not used in this function).
+//
+// If the current node is a leaf node (both left and right children are nil), the function assigns the current
+// prefix to the character stored in the node. Otherwise, it recursively traverses the left and right children,
+// appending '0' to the prefix for the left child and '1' for the right child.
 func huffmanBuilder(node *Node, prefix string, codes *map[rune]string, frequency *map[rune]int) {
 	if node == nil {
 		return
@@ -90,6 +114,15 @@ func huffmanBuilder(node *Node, prefix string, codes *map[rune]string, frequency
 	huffmanBuilder(node.right, prefix+"1", codes, frequency)
 }
 
+// rebuildHuffmanTree reconstructs a Huffman tree from a given map of runes to their corresponding binary codes.
+// Each rune in the map represents a character, and the associated string represents the binary code for that character.
+// The function returns the root node of the reconstructed Huffman tree.
+//
+// Parameters:
+//   codes (map[rune]string): A map where keys are runes (characters) and values are strings representing the binary codes.
+//
+// Returns:
+//   *Node: The root node of the reconstructed Huffman tree.
 func rebuildHuffmanTree(codes map[rune]string) *Node {
 
 	root := &Node{}
