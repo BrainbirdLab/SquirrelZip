@@ -1,6 +1,6 @@
 # SquirrelZip File Compressor/Archiver CLI Tool
 
-Simple CLI tool for compressing and decompressing files.
+Simple CLI tool for compressing and decompressing files with password.
 
 ## Usage
 
