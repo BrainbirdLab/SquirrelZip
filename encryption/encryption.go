@@ -10,7 +10,6 @@ import (
 	"file-compressor/constants"
 )
 
-
 // EncryptStream reads data from the provided reader, encrypts it, and writes the encrypted data to the provided writer.
 // If a password is provided, the data will be encrypted using the password. If no password is provided, the data will
 // be copied without encryption.
@@ -61,7 +60,6 @@ func DecryptStream(reader io.Reader, writer io.Writer, password string) error {
 	// Decrypt the data
 	return decryptWithPassword(reader, writer, password)
 }
-
 
 // writeMetadata writes metadata to the provided writer indicating whether a password is used.
 // If the password is an empty string, it writes a constant indicating no password is used.
@@ -118,7 +116,6 @@ func copyData(reader io.Reader, writer io.Writer) error {
 	return err
 }
 
-
 // encryptWithPassword encrypts data from the provided reader using the given password
 // and writes the encrypted data to the provided writer.
 //
@@ -158,7 +155,6 @@ func encryptWithPassword(reader io.Reader, writer io.Writer, password string) er
 	// Encrypt and write the data in chunks
 	return processStream(reader, writer, gcm, nonce)
 }
-
 
 // decryptWithPassword decrypts data from the provided reader using the given password
 // and writes the decrypted data to the provided writer. It returns an error if the
@@ -211,7 +207,6 @@ func decryptWithPassword(reader io.Reader, writer io.Writer, password string) er
 	return decryptStream(reader, writer, gcm, nonce)
 }
 
-
 // generateNonce generates a nonce of the appropriate size for the given
 // AEAD cipher. It uses a cryptographically secure random number generator
 // to fill the nonce with random bytes.
@@ -230,10 +225,9 @@ func generateNonce(gcm cipher.AEAD) ([]byte, error) {
 	return nonce, nil
 }
 
-
 // processStream reads data from the provided io.Reader, encrypts it using the given
 // cipher.AEAD and nonce, and writes the encrypted data to the provided io.Writer.
-// 
+//
 // Parameters:
 //   - reader: an io.Reader from which the data is read.
 //   - writer: an io.Writer to which the encrypted data is written.
@@ -265,7 +259,6 @@ func processStream(reader io.Reader, writer io.Writer, gcm cipher.AEAD, nonce []
 	}
 	return nil
 }
-
 
 // decryptStream decrypts data from the provided io.Reader and writes the decrypted data to the provided io.Writer.
 // It uses the given cipher.AEAD and nonce for decryption.

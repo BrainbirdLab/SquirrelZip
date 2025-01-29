@@ -201,8 +201,8 @@ func TestRebuildHuffmanTree(t *testing.T) {
 	root := rebuildHuffmanTree(codes)
 
 	tests := []struct {
-		char  rune
-		code  string
+		char rune
+		code string
 	}{
 		{'a', "0"},
 		{'b', "101"},

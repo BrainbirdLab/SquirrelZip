@@ -13,7 +13,6 @@ import (
 	"file-compressor/utils"
 )
 
-
 // getFrequencyMap reads data from the provided io.Reader and populates the given frequency map
 // with the count of each rune encountered in the input.
 //
@@ -209,7 +208,7 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 }
 
 // processByte processes a buffer of bytes, compressing it using Huffman codes and writing the result to an output writer.
-// 
+//
 // Parameters:
 //   - buf: A slice of bytes to be processed.
 //   - output: An io.Writer where the compressed data will be written.
@@ -268,7 +267,7 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 //   - error: An error if decompression fails, otherwise nil.
 func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, limiter uint64) error {
 
-	lastByte := make([]byte, 1) // last byte read from the reader
+	lastByte := make([]byte, 1)      // last byte read from the reader
 	lastByteCount := make([]byte, 1) // number of bits in the last byte
 
 	leftOverByte := uint32(0)
@@ -330,8 +329,8 @@ func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, l
 // - lastByteCount: A pointer to a byte slice that stores the bit count of the last byte from the previous chunk.
 // - readBuffer: A pointer to a byte slice that represents the current read buffer.
 //
-// If loopFlag is non-zero, the function increments the position by 2, appends the last byte and its count to the 
-// beginning of the read buffer, and then updates the last byte and its count based on the current position. 
+// If loopFlag is non-zero, the function increments the position by 2, appends the last byte and its count to the
+// beginning of the read buffer, and then updates the last byte and its count based on the current position.
 // Finally, it removes the last 2 bytes from the read buffer.
 func adjustBuffer(loopFlag int, n *int, lastByte *[]byte, lastByteCount *[]byte, readBuffer *[]byte) {
 	if loopFlag != 0 {
@@ -611,7 +610,6 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 	return name, nil
 }
 
-
 // Unzip decompresses data from the provided io.Reader and writes the decompressed files to the specified output path.
 // If the output path is an empty string, the current directory is used.
 //
@@ -631,7 +629,7 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 //   5. Decompresses the data and writes it to the output file.
 //   6. Closes the output file and appends its path to the result slice.
 //
-// Possible errors include issues with reading Huffman codes, reading the number of files, creating directories, 
+// Possible errors include issues with reading Huffman codes, reading the number of files, creating directories,
 // creating output files, reading compressed sizes, and decompressing data.
 func Unzip(input io.Reader, outputPath string) ([]string, error) {
 

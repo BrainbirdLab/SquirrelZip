@@ -167,7 +167,7 @@ func setupDecompressMode(Mode *MODE, inputToDecompress []string, filenameStrs *[
 	}
 
 	//cannot contain comma
-	if  len(inputToDecompress) > 1 {
+	if len(inputToDecompress) > 1 {
 		ColorPrint(RED, "Cannot decompress multiple files at once\n")
 		flagSet.Usage()
 		os.Exit(1)
@@ -195,7 +195,6 @@ func ParseCLI() ([]string, string, string, MODE, string) {
 	readAllFiles, _ := values["all"].(bool)
 	inputToDecompress, _ := values["d"].([]string)
 	algorithm, _ := values["a"].(string)
-
 
 	if version {
 		ColorPrint(WHITE, "---------- SquirrelZip ----------\n")
@@ -249,8 +248,6 @@ func ParseCLI() ([]string, string, string, MODE, string) {
 
 	return filenameStrs, outputDir, password, Mode, algorithm
 }
-
-
 
 func GetAllFileNamesFromDir(dir *string) ([]string, error) {
 

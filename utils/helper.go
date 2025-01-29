@@ -19,22 +19,22 @@ type FileData struct {
 type Algorithm string
 
 const (
-	HUFFMAN Algorithm = "huffman"
+	HUFFMAN    Algorithm = "huffman"
 	ARITHMETIC Algorithm = "arithmetic"
 
 	UNSUPPORTED Algorithm = "unsupported"
 )
 
 const (
-	FailedToCompress string = "failed to compress data: %v"
+	FailedToCompress   string = "failed to compress data: %v"
 	FailedToDecompress string = "failed to decompress data: %v"
-	MissMatch string = "decompressed data does not match original data: %v != %v"
+	MissMatch          string = "decompressed data does not match original data: %v != %v"
 )
 
 type COLOR string
 
 const (
-	GREY  COLOR = "\033[1;30m%s\033[0m"
+	GREY   COLOR = "\033[1;30m%s\033[0m"
 	RED    COLOR = "\033[1;31m%s\033[0m"
 	GREEN  COLOR = "\033[1;32m%s\033[0m"
 	YELLOW COLOR = "\033[1;33m%s\033[0m"
@@ -99,13 +99,13 @@ func TimeTrack(startTime, endTime time.Time) string {
 }
 
 type FilesRatio struct {
-	inital uint64
+	inital     uint64
 	compressed uint64
 }
 
 func NewFilesRatio(initial, compressed uint64) FilesRatio {
 	return FilesRatio{
-		inital: initial,
+		inital:     initial,
 		compressed: compressed,
 	}
 }
@@ -116,7 +116,7 @@ func (f *FilesRatio) PrintFileInfo() {
 }
 
 func (f *FilesRatio) PrintCompressionRatio() {
-	compressionRatio := (float64(f.compressed) / float64(f.inital))  * 100
+	compressionRatio := (float64(f.compressed) / float64(f.inital)) * 100
 	fmt.Printf("Compression ratio: %.2f%%\n", compressionRatio)
 }
 
@@ -126,14 +126,14 @@ func InvalidateFileName(fileBase string, outputDir string) string {
 	fileBase = filepath.Base(fileBase)
 	originalName := strings.TrimSuffix(fileBase, fileExt)
 
-	finalFile := filepath.Join(outputDir, fileDir, originalName + fileExt)
+	finalFile := filepath.Join(outputDir, fileDir, originalName+fileExt)
 
 	count := 1
 	for {
 		//if file already exists, add a number to the filename before the extension and check again
 		if _, err := os.Stat(finalFile); err == nil {
 			fileBase = fmt.Sprintf("%s_%d", originalName, count)
-			finalFile = filepath.Join(outputDir, fileDir, fileBase + fileExt)
+			finalFile = filepath.Join(outputDir, fileDir, fileBase+fileExt)
 		} else {
 			break
 		}
@@ -145,6 +145,6 @@ func InvalidateFileName(fileBase string, outputDir string) string {
 func SafeDeleteFile(filePath string) {
 	err := os.Remove(filePath)
 	if err != nil {
-		ColorPrint(RED, fmt.Sprintf(constants.FILE_REMOVE_ERROR, err.Error()) + "\n")
+		ColorPrint(RED, fmt.Sprintf(constants.FILE_REMOVE_ERROR, err.Error())+"\n")
 	}
 }

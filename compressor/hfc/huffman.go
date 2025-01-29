@@ -64,7 +64,6 @@ func buildHuffmanTree(freq *map[rune]int) (*Node, error) {
 	return heap.Pop(&pq).(*Node), nil
 }
 
-
 // GetHuffmanCodes generates Huffman codes for the given frequency map of runes.
 // It builds a Huffman tree based on the frequencies and then traverses the tree
 // to generate the corresponding Huffman codes.
@@ -88,7 +87,6 @@ func GetHuffmanCodes(freq *map[rune]int) (map[rune]string, error) {
 
 	return codes, nil
 }
-
 
 // huffmanBuilder recursively builds the Huffman codes for each character in the input.
 // It traverses the Huffman tree and assigns binary codes to characters based on their position in the tree.

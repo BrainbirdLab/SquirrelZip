@@ -13,7 +13,6 @@ var fatalDecrPassErr string = "failed to decrypt data with password: %v"
 
 const DECRYPT_SHOULD_FAIL = "should have failed"
 
-
 func TestEncryptWithPassword(t *testing.T) {
 
 	reader := bytes.NewReader(input)
@@ -39,7 +38,7 @@ func TestEncryptWithPassword(t *testing.T) {
 }
 
 func TestEncryptWithoutPassword(t *testing.T) {
-	
+
 	reader := bytes.NewReader(input)
 
 	encryptedData := bytes.NewBuffer([]byte{})
@@ -86,7 +85,7 @@ func TestDecryptInvalidData(t *testing.T) {
 }
 
 func TestDecryptInvalidPassword(t *testing.T) {
-	
+
 	reader := bytes.NewReader(input)
 
 	encryptedData := bytes.NewBuffer([]byte{})
@@ -108,7 +107,7 @@ func TestDecryptInvalidPassword(t *testing.T) {
 }
 
 func TestEncryptWithPassDecryptWithNoPass(t *testing.T) {
-	
+
 	reader := bytes.NewReader(input)
 
 	encryptedData := bytes.NewBuffer([]byte{})

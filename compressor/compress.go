@@ -22,9 +22,8 @@ func CheckCompressionAlgorithm(algo string) error {
 	}
 }
 
-
 // Compress compresses a list of files using the specified compression algorithm and saves the compressed file to the output directory.
-// 
+//
 // Parameters:
 // - filenameStrs: A slice of strings containing the paths of the files to be compressed.
 // - outputDir: A string specifying the directory where the compressed file will be saved. If not provided, a default directory will be used.
@@ -69,7 +68,6 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 		return "", fileMeta, err
 	}
 
-
 	fileName := filenameStrs[0]
 	ext := filepath.Ext(fileName)
 	fileName = strings.TrimSuffix(fileName, ext)
@@ -80,7 +78,7 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 	if err != nil {
 		return "", fileMeta, fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
-	
+
 	defer compressedFileOutput.Close()
 
 	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFileOutput, algorithm)
@@ -97,7 +95,6 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 
 	return fileName, fileMeta, err
 }
-
 
 // ReadAndCompressFiles reads a list of files, compresses them using the specified algorithm,
 // and writes the compressed data to the provided output writer.
@@ -155,8 +152,8 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 			defer file.Close()
 
 			fileData := utils.FileData{
-				Name: filenameStr,
-				Size: fileInfo.Size(),
+				Name:   filenameStr,
+				Size:   fileInfo.Size(),
 				Reader: file,
 			}
 
@@ -204,7 +201,6 @@ func writeAlgorithm(output io.Writer, algorithm string) error {
 	return nil
 }
 
-
 // WriteAndDecompressFiles reads a compressed file from the provided io.Reader,
 // decompresses it using the specified algorithm, and writes the decompressed
 // files to the given output directory.
@@ -233,7 +229,6 @@ func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorit
 
 	return fileNames, nil
 }
-
 
 // Decompress extracts files from a compressed archive.
 //
@@ -327,7 +322,7 @@ func readAlgorithm(compressedFile io.Reader) ([]byte, error) {
 }
 
 // setOutputDir sets the output directory to the directory of the first file if the output directory is not provided.
-// 
+//
 // Parameters:
 //   outputDir - A pointer to the string representing the output directory. If the string is empty, it will be set to the directory of the first file.
 //   firstFilename - The name of the first file, used to determine the default output directory if outputDir is empty.
@@ -366,8 +361,8 @@ func walkDir(filenameStr string, fileDataArr *[]utils.FileData) error {
 		defer file.Close()
 
 		fileData := utils.FileData{
-			Name: path,
-			Size: info.Size(),
+			Name:   path,
+			Size:   info.Size(),
 			Reader: file,
 		}
 

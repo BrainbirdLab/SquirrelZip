@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-
 func handleDecompress(fileName, outputDir, password string) {
 	encryptedFile, err := os.Open(fileName)
 	if err != nil {
@@ -106,7 +105,6 @@ func handleCompress(fileNames []string, outputDir, password, algorithm string) {
 	// delete the compressed file
 	utils.SafeDeleteFile(outputPath)
 }
-
 
 func main() {
 
