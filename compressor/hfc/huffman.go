@@ -117,10 +117,12 @@ func huffmanBuilder(node *Node, prefix string, codes *map[rune]string, frequency
 // The function returns the root node of the reconstructed Huffman tree.
 //
 // Parameters:
-//   codes (map[rune]string): A map where keys are runes (characters) and values are strings representing the binary codes.
+//
+//	codes (map[rune]string): A map where keys are runes (characters) and values are strings representing the binary codes.
 //
 // Returns:
-//   *Node: The root node of the reconstructed Huffman tree.
+//
+//	*Node: The root node of the reconstructed Huffman tree.
 func rebuildHuffmanTree(codes map[rune]string) *Node {
 
 	root := &Node{}

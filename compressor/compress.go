@@ -109,12 +109,12 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 //   - error: An error if any occurs during the process.
 //
 // The function performs the following steps:
-//   1. Iterates over the provided file paths.
-//   2. Retrieves file information and checks if the file is a directory.
-//   3. If the file is a directory, it recursively walks through the directory to gather file data.
-//   4. If the file is not a directory, it opens the file and appends its data to a slice.
-//   5. Writes the specified compression algorithm to the output.
-//   6. Compresses the gathered file data using the specified algorithm and writes the compressed data to the output.
+//  1. Iterates over the provided file paths.
+//  2. Retrieves file information and checks if the file is a directory.
+//  3. If the file is a directory, it recursively walks through the directory to gather file data.
+//  4. If the file is not a directory, it opens the file and appends its data to a slice.
+//  5. Writes the specified compression algorithm to the output.
+//  6. Compresses the gathered file data using the specified algorithm and writes the compressed data to the output.
 //
 // Supported compression algorithms:
 //   - utils.HUFFMAN: Uses Huffman coding for compression.
@@ -241,13 +241,13 @@ func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorit
 //   - An error if any issue occurs during the decompression process.
 //
 // The function performs the following steps:
-//   1. Checks if the compressed file exists.
-//   2. Opens the compressed file.
-//   3. Reads the compression algorithm used.
-//   4. Verifies if the compression algorithm is supported.
-//   5. Sets the output directory.
-//   6. Ensures the output directory exists.
-//   7. Decompresses the file and writes the decompressed files to the output directory.
+//  1. Checks if the compressed file exists.
+//  2. Opens the compressed file.
+//  3. Reads the compression algorithm used.
+//  4. Verifies if the compression algorithm is supported.
+//  5. Sets the output directory.
+//  6. Ensures the output directory exists.
+//  7. Decompresses the file and writes the decompressed files to the output directory.
 func Decompress(compressedFilePath, outputDir string) ([]string, error) {
 
 	outputFiles := make([]string, 0)
@@ -297,12 +297,14 @@ func Decompress(compressedFilePath, outputDir string) ([]string, error) {
 // and then reads the identifier itself.
 //
 // Parameters:
-//   compressedFile (io.Reader): The reader from which the algorithm identifier
-//   is to be read.
+//
+//	compressedFile (io.Reader): The reader from which the algorithm identifier
+//	is to be read.
 //
 // Returns:
-//   ([]byte, error): A byte slice containing the algorithm identifier if successful,
-//   or an error if there was a problem reading from the file.
+//
+//	([]byte, error): A byte slice containing the algorithm identifier if successful,
+//	or an error if there was a problem reading from the file.
 func readAlgorithm(compressedFile io.Reader) ([]byte, error) {
 	var algoLen uint8
 	var err error
@@ -324,8 +326,9 @@ func readAlgorithm(compressedFile io.Reader) ([]byte, error) {
 // setOutputDir sets the output directory to the directory of the first file if the output directory is not provided.
 //
 // Parameters:
-//   outputDir - A pointer to the string representing the output directory. If the string is empty, it will be set to the directory of the first file.
-//   firstFilename - The name of the first file, used to determine the default output directory if outputDir is empty.
+//
+//	outputDir - A pointer to the string representing the output directory. If the string is empty, it will be set to the directory of the first file.
+//	firstFilename - The name of the first file, used to determine the default output directory if outputDir is empty.
 func setOutputDir(outputDir *string, firstFilename string) {
 	// Set default output directory if not provided
 	if *outputDir == "" {
