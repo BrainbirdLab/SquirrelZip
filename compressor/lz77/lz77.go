@@ -1,124 +1,136 @@
 package lz77
 
 import (
-	"encoding/binary"
-	"io"
+    "bytes"
+    "encoding/binary"
+    "io"
 )
 
-type Token struct {
-	Offset int16
-	Length int16
-	Char   byte
+const (
+    WindowSize    = 4096 // Search window size
+    BufferSize    = 16   // Look-ahead buffer size
+    MinMatchLen   = 3    // Minimum match length
+)
+
+type Match struct {
+    Distance uint16 // Distance to the match in the window
+    Length   uint8  // Length of the match
+    NextByte byte   // Next byte after match
 }
 
-const windowSize = 20
-const chunkSize = 32
+func findLongestMatch(data []byte, currentPos int) Match {
+    windowStart := max(0, currentPos-WindowSize)
+    lookAheadEnd := min(len(data), currentPos+BufferSize)
+    
+    if currentPos >= len(data) {
+        return Match{0, 0, 0}
+    }
 
-// LZ77 compression function using io.Reader and io.Writer
-func compressLZ77(r io.Reader, w io.Writer) error {
-	buffer := make([]byte, chunkSize)
-	var slidingWindow []byte
+    bestLength := uint8(0)
+    bestDistance := uint16(0)
+    nextByte := data[currentPos]
 
-	for {
-		n, err := r.Read(buffer)
-		if n == 0 {
-			break
-		}
+    if lookAheadEnd-currentPos >= MinMatchLen {
+        for i := windowStart; i < currentPos; i++ {
+            matchLength := 0
+            for currentPos+matchLength < lookAheadEnd && 
+                i+matchLength < currentPos &&
+                data[i+matchLength] == data[currentPos+matchLength] {
+                matchLength++
+            }
 
-		if err != nil && err != io.EOF {
-			return err
-		}
+            if matchLength >= MinMatchLen && uint8(matchLength) > bestLength {
+                bestLength = uint8(matchLength)
+                bestDistance = uint16(currentPos - i)
+                if currentPos+matchLength < len(data) {
+                    nextByte = data[currentPos+matchLength]
+                }
+            }
+        }
+    }
 
-		inputBytes := buffer[:n]
-		processChunk(inputBytes, &slidingWindow, w)
-	}
-
-	return nil
+    return Match{bestDistance, bestLength, nextByte}
 }
 
-func processChunk(inputBytes []byte, slidingWindow *[]byte, w io.Writer) {
-	for i := 0; i < len(inputBytes); {
-		window := getWindow(*slidingWindow, i)
-		longestOffset, longestLength := findLongestMatch(window, inputBytes[i:])
-		nextChar := getNextChar(inputBytes, i, longestLength)
+func Compress(input []byte) ([]byte, error) {
+    var output bytes.Buffer
+    pos := 0
+    inputLen := len(input)
 
-		binary.Write(w, binary.LittleEndian, Token{Offset: longestOffset, Length: longestLength, Char: nextChar})
+    for pos < inputLen {
+        match := findLongestMatch(input, pos)
+        
+        if err := binary.Write(&output, binary.LittleEndian, match.Distance); err != nil {
+            return nil, err
+        }
+        if err := binary.Write(&output, binary.LittleEndian, match.Length); err != nil {
+            return nil, err
+        }
+        if err := binary.Write(&output, binary.LittleEndian, match.NextByte); err != nil {
+            return nil, err
+        }
 
-		*slidingWindow = updateSlidingWindow(*slidingWindow, inputBytes[i:i+int(longestLength)+1])
-		i += int(longestLength) + 1
-	}
+        if match.Length > 0 {
+            pos += int(match.Length)
+        }
+        pos++
+    }
+
+    return output.Bytes(), nil
 }
 
-func getWindow(slidingWindow []byte, i int) []byte {
-	start := i - len(slidingWindow)
-	if start < 0 {
-		start = 0
-	}
-	return slidingWindow[start:]
+func Decompress(input []byte) ([]byte, error) {
+    var output bytes.Buffer
+    reader := bytes.NewReader(input)
+
+    for {
+        var match Match
+        
+        err := binary.Read(reader, binary.LittleEndian, &match.Distance)
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return nil, err
+        }
+
+        err = binary.Read(reader, binary.LittleEndian, &match.Length)
+        if err != nil {
+            return nil, err
+        }
+
+        err = binary.Read(reader, binary.LittleEndian, &match.NextByte)
+        if err != nil {
+            return nil, err
+        }
+
+        if match.Length > 0 {
+            start := output.Len() - int(match.Distance)
+            for i := 0; i < int(match.Length); i++ {
+                if start+i >= 0 && start+i < output.Len() {
+                    b := output.Bytes()[start+i]
+                    output.WriteByte(b)
+                }
+            }
+        }
+        if pos := output.Len(); pos < len(input) {
+            output.WriteByte(match.NextByte)
+        }
+    }
+
+    return output.Bytes(), nil
 }
 
-func findLongestMatch(window, inputBytes []byte) (int16, int16) {
-	var longestOffset, longestLength int16
-	for j := 0; j < len(window); j++ {
-		length := 0
-		for length < len(window)-j && length < len(inputBytes) && window[j+length] == inputBytes[length] {
-			length++
-		}
-		if length > int(longestLength) {
-			longestOffset = int16(len(window) - j)
-			longestLength = int16(length)
-		}
-	}
-	return longestOffset, longestLength
+func max(a, b int) int {
+    if a > b {
+        return a
+    }
+    return b
 }
 
-func getNextChar(inputBytes []byte, i int, longestLength int16) byte {
-	if i+int(longestLength) < len(inputBytes) {
-		return inputBytes[i+int(longestLength)]
-	}
-	return 0
-}
-
-func updateSlidingWindow(slidingWindow, newBytes []byte) []byte {
-	slidingWindow = append(slidingWindow, newBytes...)
-	if len(slidingWindow) > windowSize {
-		slidingWindow = slidingWindow[len(slidingWindow)-windowSize:]
-	}
-	return slidingWindow
-}
-
-// LZ77 decompression function using io.Reader and io.Writer
-func decompressLZ77(r io.Reader, w io.Writer) error {
-	var slidingWindow []byte
-	var token Token
-
-	for {
-		// Read the token from io.Reader
-		err := binary.Read(r, binary.LittleEndian, &token)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		// Get the match from the sliding window
-		start := len(slidingWindow) - int(token.Offset)
-		for i := 0; i < int(token.Length); i++ {
-			w.Write([]byte{slidingWindow[start+i]})
-			slidingWindow = append(slidingWindow, slidingWindow[start+i])
-		}
-
-		// Add the next character
-		if token.Char != 0 {
-			w.Write([]byte{token.Char})
-			slidingWindow = append(slidingWindow, token.Char)
-		}
-
-		// Maintain sliding window size
-		if len(slidingWindow) > windowSize {
-			slidingWindow = slidingWindow[len(slidingWindow)-windowSize:]
-		}
-	}
-
-	return nil
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
 }
