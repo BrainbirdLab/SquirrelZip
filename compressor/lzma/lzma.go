@@ -69,7 +69,7 @@ func decompressData(reader io.Reader, writer io.Writer, limiter uint64) error {
 			}
 			return err
 		}
-		
+
 		dataRead++
 
 		if err := processFlag(flag, reader, &outBuf, buf); err != nil {
@@ -131,7 +131,6 @@ func handleMatch(reader io.Reader, outBuf *bytes.Buffer, buf []byte) error {
 	}
 	return nil
 }
-
 
 func findLongestMatch(data []byte, pos int, dict map[string]int) Match {
 	if pos >= len(data) {

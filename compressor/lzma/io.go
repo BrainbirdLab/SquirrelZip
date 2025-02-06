@@ -57,7 +57,7 @@ func Zip(files []utils.FileData, output io.Writer) error {
 }
 
 func writeFileName(fileName string, output io.Writer) error {
-	
+
 	nameBuf := bytes.NewReader([]byte(fileName))
 
 	compressedNameBuf := bytes.NewBuffer([]byte{})
