@@ -622,12 +622,12 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 //   - An error if any issue occurs during the decompression process.
 //
 // The function performs the following steps:
-//   1. Reads Huffman codes from the input.
-//   2. Reads the number of files to be decompressed.
-//   3. Iterates over each file, reading its name and creating the necessary directories.
-//   4. Creates the output file and reads its compressed size.
-//   5. Decompresses the data and writes it to the output file.
-//   6. Closes the output file and appends its path to the result slice.
+//  1. Reads Huffman codes from the input.
+//  2. Reads the number of files to be decompressed.
+//  3. Iterates over each file, reading its name and creating the necessary directories.
+//  4. Creates the output file and reads its compressed size.
+//  5. Decompresses the data and writes it to the output file.
+//  6. Closes the output file and appends its path to the result slice.
 //
 // Possible errors include issues with reading Huffman codes, reading the number of files, creating directories,
 // creating output files, reading compressed sizes, and decompressing data.
