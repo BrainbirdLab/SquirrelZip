@@ -9,16 +9,17 @@ import (
 	"strings"
 
 	"file-compressor/compressor/hfc"
+	"file-compressor/compressor/lzma"
 	"file-compressor/constants"
 	"file-compressor/utils"
 )
 
 func CheckCompressionAlgorithm(algo string) error {
 	switch utils.Algorithm(algo) {
-	case utils.HUFFMAN, utils.ARITHMETIC:
+	case utils.HUFFMAN, utils.LZMA:
 		return nil
 	default:
-		return fmt.Errorf("unsupported compression algorithm: %v", algo)
+		return fmt.Errorf(constants.UNSUPPORTED_ALGO, algo)
 	}
 }
 
@@ -169,6 +170,10 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 	switch utils.Algorithm(algorithm) {
 	case utils.HUFFMAN:
 		err = hfc.Zip(fileDataArr, output)
+	case utils.LZMA:
+		err = lzma.Zip(fileDataArr, output)
+	default:
+		return 0, fmt.Errorf("unsupported compression algorithm: %v", algorithm)
 	}
 
 	if err != nil {
@@ -225,9 +230,17 @@ func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorit
 		if err != nil {
 			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 		}
+	case utils.LZMA:
+		// Decompress the file
+		fileNames, err = lzma.Unzip(compressedFile, outputDir)
+		if err != nil {
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported compression algorithm: %v", algorithm)
 	}
 
-	return fileNames, nil
+	return fileNames, err
 }
 
 // Decompress extracts files from a compressed archive.

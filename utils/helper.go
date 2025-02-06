@@ -19,8 +19,8 @@ type FileData struct {
 type Algorithm string
 
 const (
-	HUFFMAN    Algorithm = "huffman"
-	ARITHMETIC Algorithm = "arithmetic"
+	HUFFMAN    	Algorithm = "huffman"
+	LZMA 		Algorithm = "lzma"
 
 	UNSUPPORTED Algorithm = "unsupported"
 )

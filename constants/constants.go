@@ -7,6 +7,8 @@ const (
 
 	COMPRESSED_FILE_EXT = ".compressed"
 
+	UNSUPPORTED_ALGO = "unsupported compression algorithm: %v"
+
 	FILE_CREATE_ERROR = "failed to create file: %v"
 	FILE_WRITE_ERROR  = "failed to write file: %v"
 	FILE_READ_ERROR   = "failed to read file: %v"
