@@ -466,7 +466,7 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		reader := file.Reader
 
 		//Compress and write the file name
-		if err = writeFileName(file.Name, output, codes); err != nil {
+		if err := writeFileName(file.Name, output, codes); err != nil {
 			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 

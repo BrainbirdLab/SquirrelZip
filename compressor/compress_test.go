@@ -8,6 +8,7 @@ import (
 
 func TestCompress(t *testing.T) {
 	DecompressStart(Init("huffman", t), t)
+	DecompressStart(Init("lzma", t), t)
 }
 
 func Init(algo string, t *testing.T) string {

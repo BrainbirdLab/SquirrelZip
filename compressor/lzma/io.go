@@ -4,123 +4,177 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"file-compressor/constants"
+	"file-compressor/utils"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-
-	"file-compressor/constants"
-	"file-compressor/utils"
 )
 
 func Zip(files []utils.FileData, output io.Writer) error {
-	// Write number of files
-	if err := binary.Write(output, binary.LittleEndian, uint64(len(files))); err != nil {
+
+	// Write the number of files
+	if err := writeNumOfFiles(uint64(len(files)), output); err != nil {
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
 	for _, file := range files {
-		// Write filename length and filename
-		filename := []byte(file.Name)
-		if err := binary.Write(output, binary.LittleEndian, uint16(len(filename))); err != nil {
-			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
-		}
-		if _, err := output.Write(filename); err != nil {
+		reader := file.Reader
+
+		//Compress and write the file name
+		if err := writeFileName(file.Name, output); err != nil {
 			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 
-		// Read file data
-		data, err := io.ReadAll(file.Reader)
-		if err != nil {
-			return fmt.Errorf(constants.FILE_READ_ERROR, err)
+		//write 64 bit 0 for the compressed size
+		if err := binary.Write(output, binary.LittleEndian, uint64(0)); err != nil {
+			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
+		//Compress and write the data
+		compressedLen, err := compressData(reader, output)
 
-		// Compress data
-		compressed, err := compressData(data)
 		if err != nil {
 			return fmt.Errorf(constants.ERROR_COMPRESS, err)
 		}
 
-		// Write compressed data length and data
-		if err := binary.Write(output, binary.LittleEndian, uint64(len(compressed))); err != nil {
+		//seek back to compressedLen bytes and write the compressed size
+		if _, err := output.(io.Seeker).Seek(-int64(compressedLen+8), io.SeekCurrent); err != nil { // +4 for the 4 bytes of compressed size (uint64 -> 8 bytes) | 8bit = 1byte, 64bit = 8byte
+			return fmt.Errorf("error seeking back to write the compressed size: %w", err)
+		}
+
+		if err := binary.Write(output, binary.LittleEndian, compressedLen); err != nil {
 			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
-		if _, err := output.Write(compressed); err != nil {
-			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
+
+		//seek back to the end of the file
+		if _, err := output.(io.Seeker).Seek(0, io.SeekEnd); err != nil {
+			return fmt.Errorf("error seeking to the end of the file: %w", err)
 		}
 	}
 
 	return nil
 }
 
+func writeFileName(fileName string, output io.Writer) error {
+	
+	nameBuf := bytes.NewReader([]byte(fileName))
+
+	compressedNameBuf := bytes.NewBuffer([]byte{})
+
+	compLen, err := compressData(nameBuf, compressedNameBuf)
+	if err != nil {
+		return fmt.Errorf(constants.ERROR_COMPRESS, err)
+	}
+
+	// write length of the file name buffer
+	if err := binary.Write(output, binary.LittleEndian, uint16(compLen)); err != nil {
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
+	}
+
+	// write the compressed file name
+	if err := binary.Write(output, binary.LittleEndian, compressedNameBuf.Bytes()); err != nil {
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
+	}
+
+	return nil
+}
+
+func writeNumOfFiles(numOfFiles uint64, output io.Writer) error {
+
+	if err := binary.Write(output, binary.LittleEndian, numOfFiles); err != nil {
+		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
+	}
+
+	return nil
+}
+
+func readNumOfFiles(input io.Reader) (uint64, error) {
+	var numOfFiles uint64
+	if err := binary.Read(input, binary.LittleEndian, &numOfFiles); err != nil {
+		return 0, fmt.Errorf(constants.FILE_READ_ERROR, err)
+	}
+
+	return numOfFiles, nil
+}
+
 func Unzip(input io.Reader, outputPath string) ([]string, error) {
+
 	if outputPath == "" {
-		outputPath = "."
+		outputPath = "." // Use the current directory if no output path is provided
 	}
 
-	// Read number of files
-	var numFiles uint64
-	if err := binary.Read(input, binary.LittleEndian, &numFiles); err != nil {
-		return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
+	numOfFiles, err := readNumOfFiles(input)
+	if err != nil {
+		return nil, err
 	}
 
-	if numFiles < 1 {
+	if numOfFiles < 1 {
 		return nil, errors.New("no files to decompress")
 	}
 
-	filePaths := make([]string, 0, numFiles)
+	filePaths := []string{}
 
-	for i := uint64(0); i < numFiles; i++ {
-		// Read filename length and filename
-		var nameLen uint16
-		if err := binary.Read(input, binary.LittleEndian, &nameLen); err != nil {
-			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
+	for i := uint64(0); i < numOfFiles; i++ {
+		// get the file name
+		fileName, err := readFileName(input)
+		if err != nil {
+			return nil, err
 		}
 
-		nameBytes := make([]byte, nameLen)
-		if _, err := io.ReadFull(input, nameBytes); err != nil {
-			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
-		}
+		fileName = filepath.Join(outputPath, fileName)
 
-		fileName := filepath.Join(outputPath, string(nameBytes))
 		dir := filepath.Dir(fileName)
 
-		// Create output directory if needed
 		if err := utils.MakeOutputDir(dir); err != nil {
 			return nil, fmt.Errorf(constants.ERROR_CREATE_DIR, err)
 		}
 
-		// Read compressed data length and data
-		var compressedLen uint64
-		if err := binary.Read(input, binary.LittleEndian, &compressedLen); err != nil {
-			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
-		}
-
-		compressedData := make([]byte, compressedLen)
-		if _, err := io.ReadFull(input, compressedData); err != nil {
-			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
-		}
-
-		// Decompress data
-		decompressed, err := decompressData(compressedData)
-		if err != nil {
-			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
-		}
-
-		// Write decompressed data to file
+		// writer
 		outputFile, err := os.Create(fileName)
 		if err != nil {
 			return nil, fmt.Errorf(constants.FILE_CREATE_ERROR, err)
 		}
 
-		if _, err := io.Copy(outputFile, bytes.NewReader(decompressed)); err != nil {
-			outputFile.Close()
-			return nil, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
+		// read the compressed size
+		var compressedSize uint64
+		if err := binary.Read(input, binary.LittleEndian, &compressedSize); err != nil {
+			return nil, fmt.Errorf(constants.FILE_READ_ERROR, err)
 		}
+
+		err = decompressData(input, outputFile, compressedSize)
+		if err != nil {
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
+		}
+
 		outputFile.Close()
 
 		filePaths = append(filePaths, fileName)
 	}
 
 	return filePaths, nil
+}
+
+func readFileName(input io.Reader) (string, error) {
+
+	var nameLen uint16
+	if err := binary.Read(input, binary.LittleEndian, &nameLen); err != nil {
+		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
+	}
+
+	buf := make([]byte, nameLen)
+	if err := binary.Read(input, binary.LittleEndian, buf); err != nil {
+		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
+	}
+
+	compressedFilename := bytes.NewBuffer(buf)
+
+	nameBuffer := bytes.NewBuffer([]byte{})
+	if err := decompressData(compressedFilename, nameBuffer, uint64(compressedFilename.Len())); err != nil {
+		return "", fmt.Errorf(constants.ERROR_DECOMPRESS, err)
+	}
+
+	name := nameBuffer.String()
+
+	return name, nil
 }

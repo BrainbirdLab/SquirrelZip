@@ -1,102 +1,138 @@
 package lzma
 
-import "fmt"
+import (
+	"bytes"
+	"encoding/binary"
+	"file-compressor/constants"
+	"fmt"
+	"io"
+)
 
-// Dictionary size for looking up previous occurrences
 const (
 	MaxWindowSize = 4096 // Size of sliding window
 	MinMatchLen   = 3    // Minimum length for a match
 )
 
 type Match struct {
-	offset int // Distance to the match
-	length int // Length of the match
+	offset int
+	length int
 }
 
-// compressData performs a simplified LZMA-style compression
-func compressData(input []byte) ([]byte, error) {
-	if len(input) == 0 {
-		return []byte{}, nil
+func compressData(input io.Reader, output io.Writer) (uint64, error) {
+	var inBuf bytes.Buffer
+	if _, err := inBuf.ReadFrom(input); err != nil {
+		return 0, err
 	}
+	data := inBuf.Bytes()
 
-	var output []byte
+	var outBuf bytes.Buffer
 	pos := 0
 	dictionary := make(map[string]int)
 
-	for pos < len(input) {
-		// Find longest match in the sliding window
-		match := findLongestMatch(input, pos, dictionary)
-
+	for pos < len(data) {
+		match := findLongestMatch(data, pos, dictionary)
 		if match.length >= MinMatchLen {
-			// Encode as (offset, length) pair
-			// Using simple format: [1][offset:2 bytes][length:1 byte]
-			output = append(output, 1)
-			output = append(output, byte(match.offset>>8), byte(match.offset))
-			output = append(output, byte(match.length))
+			outBuf.WriteByte(1)
+			binary.Write(&outBuf, binary.BigEndian, uint16(match.offset))
+			outBuf.WriteByte(byte(match.length))
 
-			// Update dictionary with all substrings in the match
 			for i := 0; i < match.length; i++ {
-				updateDictionary(input, pos+i, dictionary)
+				updateDictionary(data, pos+i, dictionary)
 			}
-
 			pos += match.length
 		} else {
-			// Encode literal byte
-			// Format: [0][literal byte]
-			output = append(output, 0)
-			output = append(output, input[pos])
-
-			updateDictionary(input, pos, dictionary)
+			outBuf.WriteByte(0)
+			outBuf.WriteByte(data[pos])
+			updateDictionary(data, pos, dictionary)
 			pos++
 		}
 	}
 
-	return output, nil
+	written, err := output.Write(outBuf.Bytes())
+	return uint64(written), err
 }
 
-// decompressData decodes the compressed data
-func decompressData(input []byte) ([]byte, error) {
-	if len(input) == 0 {
-		return []byte{}, nil
-	}
+func decompressData(reader io.Reader, writer io.Writer, limiter uint64) error {
+	var outBuf bytes.Buffer
+	buf := make([]byte, constants.BUFFER_SIZE)
+	dataRead := uint64(0)
 
-	var output []byte
-	pos := 0
-
-	for pos < len(input) {
-		flag := input[pos]
-		pos++
-
-		if flag == 0 {
-			// Literal byte
-			output = append(output, input[pos])
-			pos++
-		} else {
-			// Match reference
-			if pos+3 > len(input) {
-				return nil, fmt.Errorf("invalid compressed data")
-			}
-
-			offset := int(input[pos])<<8 | int(input[pos+1])
-			length := int(input[pos+2])
-			pos += 3
-
-			if offset > len(output) {
-				return nil, fmt.Errorf("invalid offset")
-			}
-
-			// Copy matched bytes
-			startPos := len(output) - offset
-			for i := 0; i < length; i++ {
-				output = append(output, output[startPos+i])
-			}
+	for {
+		if limiter > 0 && dataRead >= limiter {
+			break
 		}
+
+		flag, err := readFlag(reader, buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		
+		dataRead++
+
+		if err := processFlag(flag, reader, &outBuf, buf); err != nil {
+			return err
+		}
+		dataRead += flagDataReadIncrement(flag)
 	}
 
-	return output, nil
+	_, err := writer.Write(outBuf.Bytes())
+	return err
 }
 
-// findLongestMatch looks for the longest matching sequence in the window
+func processFlag(flag byte, reader io.Reader, outBuf *bytes.Buffer, buf []byte) error {
+	if flag == 0 {
+		return handleLiteral(reader, outBuf, buf)
+	}
+	return handleMatch(reader, outBuf, buf)
+}
+
+func flagDataReadIncrement(flag byte) uint64 {
+	if flag == 0 {
+		return 1
+	}
+	return 3
+}
+
+func readFlag(reader io.Reader, buf []byte) (byte, error) {
+	_, err := io.ReadFull(reader, buf[:1])
+	if err != nil {
+		return 0, err
+	}
+	return buf[0], nil
+}
+
+func handleLiteral(reader io.Reader, outBuf *bytes.Buffer, buf []byte) error {
+	_, err := io.ReadFull(reader, buf[:1])
+	if err != nil {
+		return err
+	}
+	outBuf.WriteByte(buf[0])
+	return nil
+}
+
+func handleMatch(reader io.Reader, outBuf *bytes.Buffer, buf []byte) error {
+	_, err := io.ReadFull(reader, buf[:3])
+	if err != nil {
+		return err
+	}
+
+	offset := int(binary.BigEndian.Uint16(buf[:2]))
+	length := int(buf[2])
+
+	if offset > outBuf.Len() {
+		return fmt.Errorf("invalid offset")
+	}
+	startPos := outBuf.Len() - offset
+	for i := 0; i < length; i++ {
+		outBuf.WriteByte(outBuf.Bytes()[startPos+i])
+	}
+	return nil
+}
+
+
 func findLongestMatch(data []byte, pos int, dict map[string]int) Match {
 	if pos >= len(data) {
 		return Match{0, 0}
@@ -105,7 +141,6 @@ func findLongestMatch(data []byte, pos int, dict map[string]int) Match {
 	maxLen := MinMatchLen - 1
 	bestMatch := Match{0, 0}
 
-	// Try matching increasing lengths
 	for length := MinMatchLen; length <= MaxWindowSize && pos+length <= len(data); length++ {
 		searchBytes := data[pos : pos+length]
 		if prevPos, exists := dict[string(searchBytes)]; exists {
@@ -120,7 +155,6 @@ func findLongestMatch(data []byte, pos int, dict map[string]int) Match {
 	return bestMatch
 }
 
-// updateDictionary adds substrings to the dictionary
 func updateDictionary(data []byte, pos int, dict map[string]int) {
 	maxSubstringLen := MinMatchLen * 2
 	for length := MinMatchLen; length <= maxSubstringLen && pos+length <= len(data); length++ {
