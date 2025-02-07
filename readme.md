@@ -41,3 +41,7 @@ Simple CLI tool for compressing and decompressing files with password.
 
 ### Decompress with password:
 ```./sq -d compressed.sq -p mySecurepass1234```
+
+### Compression Algorithms
+```./sq -c file.txt -a huffman```
+```./sq -c file.txt -a lzma```
