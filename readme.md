@@ -11,16 +11,16 @@ Simple CLI tool for compressing and decompressing files with password.
 ### Run
 
 ```./sq -c <file1,file2> -o <outputDir>```
-
-  -v      Print version information
-  -c      Input files or directory to be compressed [strings] (Space separated)
-  -o      Output directory for compressed/decompressed files (Optional)
-  -a      Algorithm to use for compression (Optional) [string]
-  -p      Password for encryption (Optional) [string]
-  -all    Read all files in the provided directory (Optional)
-  -d      Input file to decompress [strings] (Space separated)
-  -h      Print help
-
+```
+-v      Print version information
+-c      Input files or directory to be compressed [strings] (Space separated)
+-o      Output directory for compressed/decompressed files (Optional)
+-a      Algorithm to use for compression (Optional) [string]
+-p      Password for encryption (Optional) [string]
+-all    Read all files in the provided directory (Optional)
+-d      Input file to decompress [strings] (Space separated)
+-h      Print help
+```
 ## Examples
 
 ### Compress
