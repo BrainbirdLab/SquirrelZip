@@ -109,7 +109,7 @@ func (fs *FlagSet) Get(flagName string) (interface{}, bool) {
 }
 
 func (fs *FlagSet) Usage() {
-	fmt.Println("Usage: Chipmunk file archiver [options]")
+	fmt.Println("Usage: SquirrelZip file archiver [options]")
 	fmt.Println("Options:")
 	for _, flag := range fs.flags {
 		fmt.Printf("  -%s: %s\n", flag.Name, flag.Usage)
