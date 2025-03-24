@@ -1,47 +1,112 @@
-# SquirrelZip File Compressor/Archiver CLI Tool
+# SquirrelZip
 
-Simple CLI tool for compressing and decompressing files with password.
+SquirrelZip is a powerful command-line file compression and encryption tool written in Go. It provides secure file compression with optional password protection.
+
+## Features
+
+- File compression with multiple algorithm support
+- Password-based encryption for compressed files
+- Cross-platform support (Windows, Linux, macOS)
+- Command-line interface
+- Progress tracking and compression ratio reporting
+- Secure file handling with automatic cleanup
+
+# Supported Algorithms
+- Huffman
+- LZMA
+
+## Installation
+
+### Pre-built Binaries
+
+You can download pre-built binaries for your platform from the [Releases](https://github.com/itsfuad/SquirrelZip/releases) page.
+
+### Building from Source
+
+1. Ensure you have Go 1.22 or later installed
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/itsfuad/SquirrelZip.git
+   cd SquirrelZip
+   ```
+3. Build the project:
+   ```bash
+   go build
+   ```
 
 ## Usage
 
-### Build
+### Compressing Files
 
-./build
-
-### Run
-
-```./sq -c <file1,file2> -o <outputDir>```
+```bash
+sq compress [files...] -o [output_dir] -p [password] -a [algorithm]
 ```
--v      Print version information
--c      Input files or directory to be compressed [strings] (Space separated)
--o      Output directory for compressed/decompressed files (Optional)
--a      Algorithm to use for compression (Optional) [string]
--p      Password for encryption (Optional) [string]
--all    Read all files in the provided directory (Optional)
--d      Input file to decompress [strings] (Space separated)
--h      Print help
+
+Options:
+- `-o`: Output directory (optional)
+- `-p`: Password for encryption (optional)
+- `-a`: Compression algorithm (optional)
+
+### Decompressing Files
+
+```bash
+sq decompress [file] -o [output_dir] -p [password]
 ```
-## Examples
 
-### Compress
-#### Compress without password:
-```./sq -c file.txt file2.txt```
+Options:
+- `-o`: Output directory (optional)
+- `-p`: Password for decryption (required if file was encrypted)
 
-#### Compress with password:
-```./sq -c file.txt file2.txt -p mySecurepass1234```
+## Development
 
-#### Or compress the whole directory:
-```./sq -all folder```
+### Project Structure
 
-#### To provide an output path use the `-o` flag:
-```./sq -c file.txt -o output/files```
+```
+SquirrelZip/
+├── compressor/     # Compression algorithms
+├── encryption/     # Encryption/decryption logic
+├── utils/         # Utility functions
+├── constants/     # Constants and messages
+├── main.go        # Main application entry
+└── test_files/    # Test files
+```
 
-### Decompress without password:
-```./sq -d compressed.sq```
+### Building
 
-### Decompress with password:
-```./sq -d compressed.sq -p mySecurepass1234```
+```bash
+# Windows
+build.bat
 
-### Compression Algorithms
-```./sq -c file.txt -a huffman```
-```./sq -c file.txt -a lzma```
+# Linux/macOS
+go build
+```
+
+### Testing
+
+```bash
+# Windows
+test.bat
+testRun.bat
+testRunNopass.bat
+
+# Linux/macOS
+go test ./...
+```
+
+## License
+
+This project is licensed under the terms specified in the LICENSE file.
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Acknowledgments
+
+- Built with Go
+- Uses standard library compression algorithms
+- Implements secure encryption for file protection
