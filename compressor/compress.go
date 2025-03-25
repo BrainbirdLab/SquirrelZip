@@ -107,66 +107,36 @@ func Compress(filenameStrs []string, outputDir, algorithm string, progressCallba
 	return fileName, fileMeta, err
 }
 
-// ReadAndCompressFiles reads a list of files, compresses them using the specified algorithm,
-// and writes the compressed data to the provided output writer.
-//
-// Parameters:
-//   - filenameStrs: A slice of strings containing the file paths to be read and compressed.
-//   - output: An io.Writer where the compressed data will be written.
-//   - algorithm: A string specifying the compression algorithm to use.
-//   - progressCallback: A callback function to report progress during compression.
-//
-// Returns:
-//   - uint64: The total size of the original uncompressed files.
-//   - error: An error if any occurs during the process.
-//
-// The function performs the following steps:
-//  1. Iterates over the provided file paths.
-//  2. Retrieves file information and checks if the file is a directory.
-//  3. If the file is a directory, it recursively walks through the directory to gather file data.
-//  4. If the file is not a directory, it opens the file and appends its data to a slice.
-//  5. Writes the specified compression algorithm to the output.
-//  6. Compresses the gathered file data using the specified algorithm and writes the compressed data to the output.
-//
-// Supported compression algorithms:
-//   - utils.HUFFMAN: Uses Huffman coding for compression.
-//
-// Errors:
-//   - Returns an error if any file cannot be opened, read, or if compression fails.
-func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm string, progressCallback utils.ProgressCallback) (uint64, error) {
-	var err error
-	fileDataArr := []utils.FileData{}
+// collectFiles gathers file information and returns the total size and file data array
+func collectFiles(filenameStrs []string, progressCallback utils.ProgressCallback) (uint64, []utils.FileData, error) {
+	fileDataArr := make([]utils.FileData, 0)
 	originalSize := uint64(0)
 
-	// First pass: collect file information
 	for i, filenameStr := range filenameStrs {
 		fileInfo, err := os.Stat(filenameStr)
 		if err != nil {
-			return 0, fmt.Errorf("failed to get file info: %v", err)
+			return 0, nil, fmt.Errorf("failed to get file info: %v", err)
 		}
 
 		originalSize += uint64(fileInfo.Size())
 
 		if fileInfo.IsDir() {
 			if err := walkDir(filenameStr, &fileDataArr); err != nil {
-				return 0, err
+				return 0, nil, err
 			}
 		} else {
 			file, err := os.Open(filenameStr)
 			if err != nil {
-				return 0, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
+				return 0, nil, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 			}
 
-			fileData := utils.FileData{
+			fileDataArr = append(fileDataArr, utils.FileData{
 				Name:   filenameStr,
 				Size:   fileInfo.Size(),
 				Reader: file,
-			}
-
-			fileDataArr = append(fileDataArr, fileData)
+			})
 		}
 
-		// Report progress for file collection
 		if progressCallback != nil {
 			utils.UpdateProgress(utils.ProgressInfo{
 				TotalFiles:  len(filenameStrs),
@@ -176,12 +146,19 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 		}
 	}
 
-	// Write the compression algorithm to the output
+	return originalSize, fileDataArr, nil
+}
+
+func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm string, progressCallback utils.ProgressCallback) (uint64, error) {
+	originalSize, fileDataArr, err := collectFiles(filenameStrs, progressCallback)
+	if err != nil {
+		return 0, err
+	}
+
 	if err := writeAlgorithm(output, algorithm); err != nil {
 		return 0, err
 	}
 
-	// Second pass: compress files
 	switch utils.Algorithm(algorithm) {
 	case utils.HUFFMAN:
 		err = hfc.Zip(fileDataArr, output, progressCallback)
