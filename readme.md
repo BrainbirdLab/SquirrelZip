@@ -39,23 +39,30 @@ You can download pre-built binaries for your platform from the [Releases](https:
 ### Compressing Files
 
 ```bash
-sq compress [files...] -o [output_dir] -p [password] -a [algorithm]
+SquirrelZip -c [files...] -o [output_dir] -p [password] -a [algorithm] -all
 ```
 
 Options:
+- `-c`: Input files or directory to be compressed
 - `-o`: Output directory (optional)
 - `-p`: Password for encryption (optional)
-- `-a`: Compression algorithm (optional)
+- `-a`: Compression algorithm (optional, defaults to "huffman")
+- `-all`: Read all files in the input directory (optional)
 
 ### Decompressing Files
 
 ```bash
-sq decompress [file] -o [output_dir] -p [password]
+SquirrelZip -d [file] -o [output_dir] -p [password]
 ```
 
 Options:
+- `-d`: Input file to decompress
 - `-o`: Output directory (optional)
 - `-p`: Password for decryption (required if file was encrypted)
+
+### Additional Options
+- `-v`: Print version
+- `-h`: Print help
 
 ## Development
 
