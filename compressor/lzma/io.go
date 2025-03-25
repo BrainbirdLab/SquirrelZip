@@ -12,15 +12,25 @@ import (
 	"path/filepath"
 )
 
-func Zip(files []utils.FileData, output io.Writer) error {
+func Zip(files []utils.FileData, output io.Writer, progressCallback utils.ProgressCallback) error {
 
 	// Write the number of files
 	if err := writeNumOfFiles(uint64(len(files)), output); err != nil {
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
-	for _, file := range files {
+	for i, file := range files {
 		reader := file.Reader
+
+		// Report progress for current file
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:      len(files),
+				CurrentFile:     i + 1,
+				CurrentFileSize: file.Size,
+				Message:         fmt.Sprintf("Compressing file: %s", filepath.Base(file.Name)),
+			}, progressCallback)
+		}
 
 		//Compress and write the file name
 		if err := writeFileName(file.Name, output); err != nil {
@@ -50,6 +60,17 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		//seek back to the end of the file
 		if _, err := output.(io.Seeker).Seek(0, io.SeekEnd); err != nil {
 			return fmt.Errorf("error seeking to the end of the file: %w", err)
+		}
+
+		// Report progress after file is compressed
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:      len(files),
+				CurrentFile:     i + 1,
+				CurrentFileSize: file.Size,
+				ProcessedBytes:  file.Size,
+				Message:         fmt.Sprintf("Completed: %s", filepath.Base(file.Name)),
+			}, progressCallback)
 		}
 	}
 
@@ -98,8 +119,7 @@ func readNumOfFiles(input io.Reader) (uint64, error) {
 	return numOfFiles, nil
 }
 
-func Unzip(input io.Reader, outputPath string) ([]string, error) {
-
+func Unzip(input io.Reader, outputPath string, progressCallback utils.ProgressCallback) ([]string, error) {
 	if outputPath == "" {
 		outputPath = "." // Use the current directory if no output path is provided
 	}
@@ -130,6 +150,15 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 			return nil, fmt.Errorf(constants.ERROR_CREATE_DIR, err)
 		}
 
+		// Report progress for current file
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:  int(numOfFiles),
+				CurrentFile: int(i + 1),
+				Message:     fmt.Sprintf("Decompressing file: %s", filepath.Base(fileName)),
+			}, progressCallback)
+		}
+
 		// writer
 		outputFile, err := os.Create(fileName)
 		if err != nil {
@@ -150,6 +179,15 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 		outputFile.Close()
 
 		filePaths = append(filePaths, fileName)
+
+		// Report progress after file is decompressed
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:  int(numOfFiles),
+				CurrentFile: int(i + 1),
+				Message:     fmt.Sprintf("Completed: %s", filepath.Base(fileName)),
+			}, progressCallback)
+		}
 	}
 
 	return filePaths, nil

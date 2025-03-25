@@ -13,6 +13,14 @@ import (
 )
 
 func handleDecompress(fileName, outputDir, password string) {
+	// Create a progress callback function
+	progressCallback := func(progress float64, message string) {
+		// Convert progress to percentage
+		percentage := int(progress * 100)
+		// Clear the current line and print new progress
+		utils.ColorPrint(utils.YELLOW, fmt.Sprintf("\r\033[KProgress: %d%% - %s", percentage, message))
+	}
+
 	encryptedFile, err := os.Open(fileName)
 	if err != nil {
 		utils.ColorPrint(utils.RED, fmt.Sprintf(constants.FILE_OPEN_ERROR, err.Error()))
@@ -40,13 +48,16 @@ func handleDecompress(fileName, outputDir, password string) {
 
 	decryptedFile.Close()
 
-	paths, err := compressor.Decompress(decryptedFilePath, outputDir)
+	paths, err := compressor.Decompress(decryptedFilePath, outputDir, progressCallback)
 	if err != nil {
 		utils.ColorPrint(utils.RED, err.Error()+"\n")
 		// delete the decrypted file
 		//utils.SafeDeleteFile(decryptedFilePath)
 		os.Exit(-1)
 	}
+
+	// Print newline after progress bar
+	utils.ColorPrint(utils.YELLOW, "\n\n")
 
 	// delete the decrypted file
 	utils.SafeDeleteFile(decryptedFilePath)
@@ -57,12 +68,23 @@ func handleDecompress(fileName, outputDir, password string) {
 }
 
 func handleCompress(fileNames []string, outputDir, password, algorithm string) {
-	outputPath, fileMeta, err := compressor.Compress(fileNames, outputDir, algorithm)
+	// Create a progress callback function
+	progressCallback := func(progress float64, message string) {
+		// Convert progress to percentage
+		percentage := int(progress * 100)
+		// Clear the current line and print new progress
+		utils.ColorPrint(utils.YELLOW, fmt.Sprintf("\r\033[KProgress: %d%% - %s", percentage, message))
+	}
+
+	outputPath, fileMeta, err := compressor.Compress(fileNames, outputDir, algorithm, progressCallback)
 	if err != nil {
 		utils.ColorPrint(utils.RED, err.Error()+"\n")
 		utils.SafeDeleteFile(outputPath)
 		os.Exit(-1)
 	}
+
+	// Print newline after progress bar
+	utils.ColorPrint(utils.YELLOW, "\n\n")
 
 	fileMeta.PrintFileInfo()
 	fileMeta.PrintCompressionRatio()

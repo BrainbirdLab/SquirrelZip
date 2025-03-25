@@ -261,7 +261,7 @@ func RunFile(targetPath string, t *testing.T) {
 	}
 
 	// Compress
-	err = Zip([]utils.FileData{inputFileData}, compressedFile)
+	err = Zip([]utils.FileData{inputFileData}, compressedFile, nil)
 	if err != nil {
 		t.Fatalf("failed to compress file: %v", err)
 	}
@@ -287,7 +287,7 @@ func RunFile(targetPath string, t *testing.T) {
 	compressedFile.Seek(0, io.SeekStart)
 
 	// Decompress
-	fileNames, err := Unzip(compressedFile, "decompress_output")
+	fileNames, err := Unzip(compressedFile, "decompress_output", nil)
 	if err != nil {
 		t.Fatalf("failed to decompress file: %v", err)
 	}

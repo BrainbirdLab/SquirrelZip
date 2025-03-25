@@ -29,6 +29,7 @@ func CheckCompressionAlgorithm(algo string) error {
 // - filenameStrs: A slice of strings containing the paths of the files to be compressed.
 // - outputDir: A string specifying the directory where the compressed file will be saved. If not provided, a default directory will be used.
 // - algorithm: A string specifying the compression algorithm to be used.
+// - progressCallback: A callback function to report progress during compression.
 //
 // Returns:
 // - A string representing the path of the compressed file.
@@ -45,8 +46,7 @@ func CheckCompressionAlgorithm(algo string) error {
 // 7. Reads and compresses the input files using the specified algorithm.
 // 8. Calculates the size ratio between the original and compressed files.
 // 9. Returns the path of the compressed file, the size ratio, and any error encountered.
-func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils.FilesRatio, error) {
-
+func Compress(filenameStrs []string, outputDir, algorithm string, progressCallback utils.ProgressCallback) (string, utils.FilesRatio, error) {
 	fileMeta := utils.FilesRatio{}
 	//check if files exist
 	for _, filenameStr := range filenameStrs {
@@ -82,7 +82,12 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 
 	defer compressedFileOutput.Close()
 
-	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFileOutput, algorithm)
+	// Report initial progress
+	if progressCallback != nil {
+		progressCallback(0.0, "Starting compression...")
+	}
+
+	originalSize, err := ReadAndCompressFiles(filenameStrs, compressedFileOutput, algorithm, progressCallback)
 	if err != nil {
 		return "", fileMeta, err
 	}
@@ -94,6 +99,11 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 
 	fileMeta = utils.NewFilesRatio(originalSize, uint64(compressedStat.Size()))
 
+	// Report completion
+	if progressCallback != nil {
+		progressCallback(1.0, "Compression completed")
+	}
+
 	return fileName, fileMeta, err
 }
 
@@ -104,6 +114,7 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 //   - filenameStrs: A slice of strings containing the file paths to be read and compressed.
 //   - output: An io.Writer where the compressed data will be written.
 //   - algorithm: A string specifying the compression algorithm to use.
+//   - progressCallback: A callback function to report progress during compression.
 //
 // Returns:
 //   - uint64: The total size of the original uncompressed files.
@@ -122,16 +133,13 @@ func Compress(filenameStrs []string, outputDir, algorithm string) (string, utils
 //
 // Errors:
 //   - Returns an error if any file cannot be opened, read, or if compression fails.
-func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm string) (uint64, error) {
-
+func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm string, progressCallback utils.ProgressCallback) (uint64, error) {
 	var err error
-
 	fileDataArr := []utils.FileData{}
-
 	originalSize := uint64(0)
 
-	for _, filenameStr := range filenameStrs {
-		// Get the file info
+	// First pass: collect file information
+	for i, filenameStr := range filenameStrs {
 		fileInfo, err := os.Stat(filenameStr)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get file info: %v", err)
@@ -139,7 +147,6 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 
 		originalSize += uint64(fileInfo.Size())
 
-		// Check if the file is a directory
 		if fileInfo.IsDir() {
 			if err := walkDir(filenameStr, &fileDataArr); err != nil {
 				return 0, err
@@ -150,8 +157,6 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 				return 0, fmt.Errorf(constants.FILE_OPEN_ERROR, err)
 			}
 
-			defer file.Close()
-
 			fileData := utils.FileData{
 				Name:   filenameStr,
 				Size:   fileInfo.Size(),
@@ -160,6 +165,15 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 
 			fileDataArr = append(fileDataArr, fileData)
 		}
+
+		// Report progress for file collection
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:  len(filenameStrs),
+				CurrentFile: i + 1,
+				Message:     fmt.Sprintf("Collecting file information: %s", filepath.Base(filenameStr)),
+			}, progressCallback)
+		}
 	}
 
 	// Write the compression algorithm to the output
@@ -167,11 +181,12 @@ func ReadAndCompressFiles(filenameStrs []string, output io.Writer, algorithm str
 		return 0, err
 	}
 
+	// Second pass: compress files
 	switch utils.Algorithm(algorithm) {
 	case utils.HUFFMAN:
-		err = hfc.Zip(fileDataArr, output)
+		err = hfc.Zip(fileDataArr, output, progressCallback)
 	case utils.LZMA:
-		err = lzma.Zip(fileDataArr, output)
+		err = lzma.Zip(fileDataArr, output, progressCallback)
 	default:
 		return 0, fmt.Errorf("unsupported compression algorithm: %v", algorithm)
 	}
@@ -206,67 +221,17 @@ func writeAlgorithm(output io.Writer, algorithm string) error {
 	return nil
 }
 
-// WriteAndDecompressFiles reads a compressed file from the provided io.Reader,
-// decompresses it using the specified algorithm, and writes the decompressed
-// files to the given output directory.
-//
-// Parameters:
-//   - compressedFile: an io.Reader from which the compressed file is read.
-//   - outputDir: a string specifying the directory where decompressed files will be written.
-//   - algorithm: a byte slice indicating the decompression algorithm to use.
-//
-// Returns:
-//   - A slice of strings containing the names of the decompressed files.
-//   - An error if the decompression process fails.
-func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorithm []byte) ([]string, error) {
-
-	var fileNames []string
-	var err error
-
-	switch utils.Algorithm(algorithm) {
-	case utils.HUFFMAN:
-		// Decompress the file
-		fileNames, err = hfc.Unzip(compressedFile, outputDir)
-		if err != nil {
-			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
-		}
-	case utils.LZMA:
-		// Decompress the file
-		fileNames, err = lzma.Unzip(compressedFile, outputDir)
-		if err != nil {
-			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported compression algorithm: %v", algorithm)
-	}
-
-	return fileNames, err
-}
-
 // Decompress extracts files from a compressed archive.
-//
-// Parameters:
-//   - compressedFilePath: The path to the compressed file to be decompressed.
-//   - outputDir: The directory where the decompressed files will be stored.
-//
-// Returns:
-//   - A slice of strings containing the names of the decompressed files.
-//   - An error if any issue occurs during the decompression process.
-//
-// The function performs the following steps:
-//  1. Checks if the compressed file exists.
-//  2. Opens the compressed file.
-//  3. Reads the compression algorithm used.
-//  4. Verifies if the compression algorithm is supported.
-//  5. Sets the output directory.
-//  6. Ensures the output directory exists.
-//  7. Decompresses the file and writes the decompressed files to the output directory.
-func Decompress(compressedFilePath, outputDir string) ([]string, error) {
-
+func Decompress(compressedFilePath, outputDir string, progressCallback utils.ProgressCallback) ([]string, error) {
 	outputFiles := make([]string, 0)
 	// check if the compressed file exists
 	if _, err := os.Stat(compressedFilePath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("compressed file '%s' does not exist", compressedFilePath)
+	}
+
+	// Report initial progress
+	if progressCallback != nil {
+		progressCallback(0.0, "Starting decompression...")
 	}
 
 	// decrypt the compressed file first
@@ -297,12 +262,44 @@ func Decompress(compressedFilePath, outputDir string) ([]string, error) {
 	}
 
 	// Decompress the file
-	fileNames, err := WriteAndDecompressFiles(compressedFile, outputDir, algorithm)
+	fileNames, err := WriteAndDecompressFiles(compressedFile, outputDir, algorithm, progressCallback)
 	if err != nil {
 		return outputFiles, err
 	}
 
+	// Report completion
+	if progressCallback != nil {
+		progressCallback(1.0, "Decompression completed")
+	}
+
 	return fileNames, nil
+}
+
+// WriteAndDecompressFiles reads a compressed file from the provided io.Reader,
+// decompresses it using the specified algorithm, and writes the decompressed
+// files to the given output directory.
+func WriteAndDecompressFiles(compressedFile io.Reader, outputDir string, algorithm []byte, progressCallback utils.ProgressCallback) ([]string, error) {
+	var fileNames []string
+	var err error
+
+	switch utils.Algorithm(algorithm) {
+	case utils.HUFFMAN:
+		// Decompress the file
+		fileNames, err = hfc.Unzip(compressedFile, outputDir, progressCallback)
+		if err != nil {
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
+		}
+	case utils.LZMA:
+		// Decompress the file
+		fileNames, err = lzma.Unzip(compressedFile, outputDir, progressCallback)
+		if err != nil {
+			return nil, fmt.Errorf(constants.ERROR_DECOMPRESS, err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported compression algorithm: %v", algorithm)
+	}
+
+	return fileNames, err
 }
 
 // readAlgorithm reads the compression algorithm identifier from the provided

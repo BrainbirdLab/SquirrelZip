@@ -24,7 +24,7 @@ func Init(algo string, t *testing.T) string {
 	}
 
 	outputDir := "test_files/compress_output"
-	outputPath, fileMeta, err := Compress(fileNameStrs, outputDir, algo)
+	outputPath, fileMeta, err := Compress(fileNameStrs, outputDir, algo, nil)
 	if err != nil {
 		t.Fatalf("failed to compress files: %v", err)
 	}
@@ -39,7 +39,7 @@ func Init(algo string, t *testing.T) string {
 
 func DecompressStart(compressedPath string, t *testing.T) {
 	fmt.Printf("Decompressing file: %s\n", compressedPath)
-	_, err := Decompress(compressedPath, "test_files/decompressed_output")
+	_, err := Decompress(compressedPath, "test_files/decompressed_output", nil)
 	if err != nil {
 		t.Fatalf("failed to decompress files: %v", err)
 	}

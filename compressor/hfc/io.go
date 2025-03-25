@@ -447,11 +447,11 @@ func decompressRemainingBits(remainingBits uint32, remainingBitsLen uint8, numOf
 // Parameters:
 //   - files: A slice of utils.FileData representing the files to be compressed.
 //   - output: An io.Writer where the compressed data will be written.
+//   - progressCallback: A callback function to report progress.
 //
 // Returns:
 //   - error: An error if any step in the compression process fails.
-func Zip(files []utils.FileData, output io.Writer) error {
-
+func Zip(files []utils.FileData, output io.Writer, progressCallback utils.ProgressCallback) error {
 	codes, err := generateCodes(&files, output)
 	if err != nil {
 		return fmt.Errorf("error preparing codes: %w", err)
@@ -462,8 +462,18 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
-	for _, file := range files {
+	for i, file := range files {
 		reader := file.Reader
+
+		// Report progress for current file
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:      len(files),
+				CurrentFile:     i + 1,
+				CurrentFileSize: file.Size,
+				Message:         fmt.Sprintf("Compressing file: %s", filepath.Base(file.Name)),
+			}, progressCallback)
+		}
 
 		//Compress and write the file name
 		if err := writeFileName(file.Name, output, codes); err != nil {
@@ -474,15 +484,15 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		if err := binary.Write(output, binary.LittleEndian, uint64(0)); err != nil {
 			return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
+
 		//Compress and write the data
 		compressedLen, err := compressData(reader, output, codes)
-
 		if err != nil {
 			return fmt.Errorf(constants.ERROR_COMPRESS, err)
 		}
 
 		//seek back to compressedLen bytes and write the compressed size
-		if _, err := output.(io.Seeker).Seek(-int64(compressedLen+8), io.SeekCurrent); err != nil { // +4 for the 4 bytes of compressed size (uint64 -> 8 bytes) | 8bit = 1byte, 64bit = 8byte
+		if _, err := output.(io.Seeker).Seek(-int64(compressedLen+8), io.SeekCurrent); err != nil {
 			return fmt.Errorf("error seeking back to write the compressed size: %w", err)
 		}
 
@@ -493,6 +503,17 @@ func Zip(files []utils.FileData, output io.Writer) error {
 		//seek back to the end of the file
 		if _, err := output.(io.Seeker).Seek(0, io.SeekEnd); err != nil {
 			return fmt.Errorf("error seeking to the end of the file: %w", err)
+		}
+
+		// Report progress after file is compressed
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:      len(files),
+				CurrentFile:     i + 1,
+				CurrentFileSize: file.Size,
+				ProcessedBytes:  file.Size,
+				Message:         fmt.Sprintf("Completed: %s", filepath.Base(file.Name)),
+			}, progressCallback)
 		}
 	}
 
@@ -611,28 +632,7 @@ func readFileName(input io.Reader, codes map[rune]string) (string, error) {
 }
 
 // Unzip decompresses data from the provided io.Reader and writes the decompressed files to the specified output path.
-// If the output path is an empty string, the current directory is used.
-//
-// Parameters:
-//   - input: An io.Reader from which the compressed data is read.
-//   - outputPath: A string specifying the directory where the decompressed files will be written.
-//
-// Returns:
-//   - A slice of strings containing the paths of the decompressed files.
-//   - An error if any issue occurs during the decompression process.
-//
-// The function performs the following steps:
-//  1. Reads Huffman codes from the input.
-//  2. Reads the number of files to be decompressed.
-//  3. Iterates over each file, reading its name and creating the necessary directories.
-//  4. Creates the output file and reads its compressed size.
-//  5. Decompresses the data and writes it to the output file.
-//  6. Closes the output file and appends its path to the result slice.
-//
-// Possible errors include issues with reading Huffman codes, reading the number of files, creating directories,
-// creating output files, reading compressed sizes, and decompressing data.
-func Unzip(input io.Reader, outputPath string) ([]string, error) {
-
+func Unzip(input io.Reader, outputPath string, progressCallback utils.ProgressCallback) ([]string, error) {
 	if outputPath == "" {
 		outputPath = "." // Use the current directory if no output path is provided
 	}
@@ -668,6 +668,15 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 			return nil, fmt.Errorf(constants.ERROR_CREATE_DIR, err)
 		}
 
+		// Report progress for current file
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:  int(numOfFiles),
+				CurrentFile: int(i + 1),
+				Message:     fmt.Sprintf("Decompressing file: %s", filepath.Base(fileName)),
+			}, progressCallback)
+		}
+
 		// writer
 		outputFile, err := os.Create(fileName)
 		if err != nil {
@@ -688,6 +697,15 @@ func Unzip(input io.Reader, outputPath string) ([]string, error) {
 		outputFile.Close()
 
 		filePaths = append(filePaths, fileName)
+
+		// Report progress after file is decompressed
+		if progressCallback != nil {
+			utils.UpdateProgress(utils.ProgressInfo{
+				TotalFiles:  int(numOfFiles),
+				CurrentFile: int(i + 1),
+				Message:     fmt.Sprintf("Completed: %s", filepath.Base(fileName)),
+			}, progressCallback)
+		}
 	}
 
 	return filePaths, nil
