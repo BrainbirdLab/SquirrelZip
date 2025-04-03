@@ -237,8 +237,8 @@ func ParseCLI() ([]string, string, string, MODE, string) {
 	//check if algorithm is provided
 	switch algorithm {
 	case "":
-		algorithm = "huffman"
-	case "huffman":
+		algorithm = string(HUFFMAN)
+	case string(HUFFMAN), string(LZMA):
 		break
 	default:
 		ColorPrint(RED, fmt.Sprintf("Unsupported algorithm: %s\n", algorithm))
