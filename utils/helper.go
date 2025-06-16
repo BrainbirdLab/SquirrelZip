@@ -21,6 +21,7 @@ type Algorithm string
 const (
 	HUFFMAN Algorithm = "huffman"
 	LZMA    Algorithm = "lzma"
+	LZW     Algorithm = "lzw"
 
 	UNSUPPORTED Algorithm = "unsupported"
 )
