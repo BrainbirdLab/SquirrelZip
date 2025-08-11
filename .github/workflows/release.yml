@@ -5,23 +5,21 @@ on:
     workflows: ["CI"]
     types:
       - completed
-  push:
-    tags:
-      - v*
+    branches:
+      - release
+  # Also allow manual triggering for releases
+  workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   release:
-    if: |
-      (github.event.workflow_run.conclusion == 'success' && github.event_name == 'workflow_run') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -31,21 +29,28 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: '1.21'
 
       - name: Build for Multiple Platforms
+        working-directory: ./
         run: |
-          mkdir -p releases
-          PLATFORMS=("windows/amd64" "linux/amd64" "darwin/amd64" "darwin/arm64")
+          mkdir -p ../releases
+          
+          # Build for different platforms
+          PLATFORMS=("windows/amd64" "linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64")
           for platform in "${PLATFORMS[@]}"; do
             OS=${platform%/*}
             ARCH=${platform#*/}
-            output_name="releases/squirrelzip-${OS}-${ARCH}"
+            output_name="../releases/sq-${OS}-${ARCH}"
             if [ $OS = "windows" ]; then
               output_name="$output_name.exe"
             fi
-            GOOS=$OS GOARCH=$ARCH go build -o "$output_name" .
+            echo "Building for $OS/$ARCH..."
+            GOOS=$OS GOARCH=$ARCH go build -ldflags="-s -w" -o "$output_name" .
           done
+          
+          # Make binaries executable
+          chmod +x ../releases/sq-*
 
       - name: Generate Next Version
         id: semver
@@ -54,12 +59,39 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dry_run: true
 
+      - name: Check if release already exists
+        id: check_release
+        run: |
+          VERSION="${{ steps.semver.outputs.new_tag }}"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists, skipping..."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create Release
+        if: steps.check_release.outputs.skip == 'false' && steps.semver.outputs.new_tag != ''
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.semver.outputs.new_tag }}
-          name: Release ${{ steps.semver.outputs.new_tag }}
-          body: ${{ steps.semver.outputs.changelog }}
+          name: "Squirrel Zip ${{ steps.semver.outputs.new_tag }}"
+          body: |
+            ## What's Changed
+            
+            ${{ steps.semver.outputs.changelog }}
+            
+            ## Downloads
+            
+            Download the appropriate binary for your platform:
+            - **Linux (x64)**: sq-linux-amd64
+            - **Linux (ARM64)**: sq-linux-arm64
+            - **Windows (x64)**: sq-windows-amd64.exe
+            - **macOS (Intel)**: sq-darwin-amd64
+            - **macOS (Apple Silicon)**: sq-darwin-arm64
+            ```
           files: |
             releases/*
         env:
