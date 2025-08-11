@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"file-compressor/constants"
+	"file-compressor/utils"
 	"fmt"
 	"io"
 )
@@ -19,11 +20,17 @@ type Match struct {
 }
 
 func compressData(input io.Reader, output io.Writer) (uint64, error) {
+	return compressDataWithProgress(input, output, "", nil)
+}
+
+// compressDataWithProgress is the enhanced version that supports progress reporting
+func compressDataWithProgress(input io.Reader, output io.Writer, fileName string, progressCallback utils.ProgressCallback) (uint64, error) {
 	var inBuf bytes.Buffer
 	if _, err := inBuf.ReadFrom(input); err != nil {
 		return 0, err
 	}
 	data := inBuf.Bytes()
+	totalBytes := len(data)
 
 	var outBuf bytes.Buffer
 	pos := 0
@@ -46,6 +53,12 @@ func compressData(input io.Reader, output io.Writer) (uint64, error) {
 			updateDictionary(data, pos, dictionary)
 			pos++
 		}
+
+		// Report progress every 0.01% for very smooth updates
+		if progressCallback != nil && totalBytes > 0 {
+			progress := float64(pos) / float64(totalBytes)
+			progressCallback(progress, fmt.Sprintf("Compressing: %s (%.2f%%)", fileName, progress*100))
+		}
 	}
 
 	written, err := output.Write(outBuf.Bytes())
@@ -53,33 +66,71 @@ func compressData(input io.Reader, output io.Writer) (uint64, error) {
 }
 
 func decompressData(reader io.Reader, writer io.Writer, limiter uint64) error {
-	var outBuf bytes.Buffer
+	return decompressDataWithProgress(reader, writer, limiter, "", nil)
+}
+
+// lzmaDecompressionState holds the state during LZMA decompression
+type lzmaDecompressionState struct {
+	outBuf   bytes.Buffer
+	dataRead uint64
+}
+
+// decompressDataWithProgress is the enhanced version that supports progress reporting
+func decompressDataWithProgress(reader io.Reader, writer io.Writer, limiter uint64, fileName string, progressCallback utils.ProgressCallback) error {
+	state := &lzmaDecompressionState{}
 	buf := make([]byte, constants.BUFFER_SIZE)
-	dataRead := uint64(0)
 
 	for {
-		if limiter > 0 && dataRead >= limiter {
+		if shouldStopDecompression(state.dataRead, limiter) {
 			break
 		}
 
-		flag, err := readFlag(reader, buf)
-		if err != nil {
+		if err := processDecompressionStep(reader, &state.outBuf, buf, state, limiter, fileName, progressCallback); err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-
-		dataRead++
-
-		if err := processFlag(flag, reader, &outBuf, buf); err != nil {
-			return err
-		}
-		dataRead += flagDataReadIncrement(flag)
 	}
 
-	_, err := writer.Write(outBuf.Bytes())
+	_, err := writer.Write(state.outBuf.Bytes())
 	return err
+}
+
+// shouldStopDecompression checks if decompression should stop
+func shouldStopDecompression(dataRead, limiter uint64) bool {
+	return limiter > 0 && dataRead >= limiter
+}
+
+// processDecompressionStep processes a single step in LZMA decompression
+func processDecompressionStep(reader io.Reader, outBuf *bytes.Buffer, buf []byte, state *lzmaDecompressionState, limiter uint64, fileName string, progressCallback utils.ProgressCallback) error {
+	flag, err := readFlag(reader, buf)
+	if err != nil {
+		return err
+	}
+
+	state.dataRead++
+
+	if err := processFlag(flag, reader, outBuf, buf); err != nil {
+		return err
+	}
+	state.dataRead += flagDataReadIncrement(flag)
+
+	// Report progress during decompression
+	reportLZMADecompressionProgress(progressCallback, state.dataRead, limiter, fileName)
+
+	return nil
+}
+
+// reportLZMADecompressionProgress reports the current LZMA decompression progress
+func reportLZMADecompressionProgress(progressCallback utils.ProgressCallback, dataRead, limiter uint64, fileName string) {
+	if progressCallback != nil && limiter > 0 {
+		progress := float64(dataRead) / float64(limiter)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+		progressCallback(progress, fmt.Sprintf("Decompressing: %s (%.2f%%)", fileName, progress*100))
+	}
 }
 
 func processFlag(flag byte, reader io.Reader, outBuf *bytes.Buffer, buf []byte) error {

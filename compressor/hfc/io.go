@@ -167,29 +167,71 @@ func ReadHuffmanCodes(file io.Reader) (map[rune]string, error) {
 // the number of bits used in the last byte to the output. If an error occurs during reading, processing, or
 // writing, the function returns the error.
 func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uint64, error) {
-	var currentByte byte
-	var bitCount uint8
-	compressedLength := uint64(0)
+	return compressDataWithProgress(input, output, codes, 0, "", nil)
+}
+
+// compressionState holds the state during compression
+type compressionState struct {
+	currentByte      byte
+	bitCount         uint8
+	compressedLength uint64
+	processedBytes   int64
+}
+
+// compressDataWithProgress is the enhanced version that supports progress reporting
+func compressDataWithProgress(input io.Reader, output io.Writer, codes map[rune]string, fileSize int64, fileName string, progressCallback utils.ProgressCallback) (uint64, error) {
+	state := &compressionState{}
+
+	if err := processCompressionLoop(input, output, codes, fileSize, fileName, progressCallback, state); err != nil {
+		return 0, err
+	}
+
+	return finalizeCompression(output, state)
+}
+
+// processCompressionLoop handles the main compression loop
+func processCompressionLoop(input io.Reader, output io.Writer, codes map[rune]string, fileSize int64, fileName string, progressCallback utils.ProgressCallback, state *compressionState) error {
 	buf := make([]byte, constants.BUFFER_SIZE)
 
 	for {
 		n, err := input.Read(buf)
 		if err != nil && err != io.EOF {
-			return 0, fmt.Errorf(constants.BUFFER_READ_ERROR, err)
+			return fmt.Errorf(constants.BUFFER_READ_ERROR, err)
 		}
 		if n == 0 {
 			break // EOF reached
 		}
 
-		if err := processByte(buf[:n], output, codes, &currentByte, &bitCount, &compressedLength); err != nil {
-			return 0, fmt.Errorf(constants.ERROR_COMPRESS, err)
+		if err := processByte(buf[:n], output, codes, &state.currentByte, &state.bitCount, &state.compressedLength); err != nil {
+			return fmt.Errorf(constants.ERROR_COMPRESS, err)
 		}
+
+		// Update progress after processing each chunk - report every 0.01%
+		state.processedBytes += int64(n)
+		reportCompressionProgress(progressCallback, state.processedBytes, fileSize, fileName)
 	}
+
+	return nil
+}
+
+// reportCompressionProgress reports the current compression progress
+func reportCompressionProgress(progressCallback utils.ProgressCallback, processedBytes, fileSize int64, fileName string) {
+	if progressCallback != nil && fileSize > 0 {
+		progress := float64(processedBytes) / float64(fileSize)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+		progressCallback(progress, fmt.Sprintf("Compressing: %s (%.2f%%)", fileName, progress*100))
+	}
+}
+
+// finalizeCompression handles the final compression steps
+func finalizeCompression(output io.Writer, state *compressionState) (uint64, error) {
 	// if there are remaining bits in the current byte, write them to the output
-	if bitCount > 0 {
+	if state.bitCount > 0 {
 		// Pad the last byte with zeros
-		currentByte <<= 8 - bitCount
-		if err := binary.Write(output, binary.LittleEndian, currentByte); err != nil {
+		state.currentByte <<= 8 - state.bitCount
+		if err := binary.Write(output, binary.LittleEndian, state.currentByte); err != nil {
 			return 0, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 		}
 	} else {
@@ -198,13 +240,13 @@ func compressData(input io.Reader, output io.Writer, codes map[rune]string) (uin
 		}
 	}
 	// Write the number of bits in the last byte
-	if err := binary.Write(output, binary.LittleEndian, bitCount); err != nil {
+	if err := binary.Write(output, binary.LittleEndian, state.bitCount); err != nil {
 		return 0, fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
-	compressedLength += 2 // 1 byte for the last byte and 1 byte for the number of bits in the last byte
+	state.compressedLength += 2 // 1 byte for the last byte and 1 byte for the number of bits in the last byte
 
-	return compressedLength, nil
+	return state.compressedLength, nil
 }
 
 // processByte processes a buffer of bytes, compressing it using Huffman codes and writing the result to an output writer.
@@ -266,57 +308,111 @@ func processByte(buf []byte, output io.Writer, codes map[rune]string, currentByt
 // Returns:
 //   - error: An error if decompression fails, otherwise nil.
 func decompressData(reader io.Reader, writer io.Writer, codes map[rune]string, limiter uint64) error {
+	return decompressDataWithProgress(reader, writer, codes, limiter, "", nil)
+}
 
-	lastByte := make([]byte, 1)      // last byte read from the reader
-	lastByteCount := make([]byte, 1) // number of bits in the last byte
+// decompressionContext holds the context for decompression operations
+type decompressionContext struct {
+	reader           io.Reader
+	writer           io.Writer
+	root             *Node
+	currentNode      *Node
+	state            *decompressionState
+	limiter          uint64
+	fileName         string
+	progressCallback utils.ProgressCallback
+}
 
-	leftOverByte := uint32(0)
-	leftOverByteCount := uint8(0)
+// decompressDataWithProgress is the enhanced version that supports progress reporting
+func decompressDataWithProgress(reader io.Reader, writer io.Writer, codes map[rune]string, limiter uint64, fileName string, progressCallback utils.ProgressCallback) error {
+	state := &decompressionState{
+		lastByte:      make([]byte, 1),
+		lastByteCount: make([]byte, 1),
+	}
 
-	loopFlag := 0
 	root := rebuildHuffmanTree(codes)
 	currentNode := root
 
-	// if the limiter is not -1, then we only read limiter bytes
+	ctx := &decompressionContext{
+		reader:           reader,
+		writer:           writer,
+		root:             root,
+		currentNode:      currentNode,
+		state:            state,
+		limiter:          limiter,
+		fileName:         fileName,
+		progressCallback: progressCallback,
+	}
 
-	dataRead := uint64(0)
+	return processDecompressionLoop(ctx)
+}
 
+// decompressionState holds the state during decompression
+type decompressionState struct {
+	lastByte          []byte
+	lastByteCount     []byte
+	leftOverByte      uint32
+	leftOverByteCount uint8
+	loopFlag          int
+	dataRead          uint64
+}
+
+// processDecompressionLoop handles the main decompression loop
+func processDecompressionLoop(ctx *decompressionContext) error {
 	bytesToRead := constants.BUFFER_SIZE
 
 	for {
-
-		if dataRead <= limiter {
-			bytesToRead = int(min(constants.BUFFER_SIZE, limiter-dataRead))
+		if ctx.state.dataRead <= ctx.limiter {
+			bytesToRead = int(min(constants.BUFFER_SIZE, ctx.limiter-ctx.state.dataRead))
 		}
 
 		readBuffer := make([]byte, bytesToRead)
-		n, err := reader.Read(readBuffer)
+		n, err := ctx.reader.Read(readBuffer)
 		if err != nil && err != io.EOF {
 			return err
 		}
 
-		dataRead += uint64(n)
+		ctx.state.dataRead += uint64(n)
+
+		// Report progress during decompression
+		reportDecompressionProgress(ctx.progressCallback, ctx.state.dataRead, ctx.limiter, ctx.fileName)
 
 		if n == 0 {
-
-			err := decompressRemainingBits(leftOverByte, leftOverByteCount, uint8(lastByteCount[0]), lastByte[0], writer, root)
-			if err != nil {
-				return fmt.Errorf(constants.ERROR_COMPRESS, err)
-			}
-
-			break
-		} else {
-
-			adjustBuffer(loopFlag, &n, &lastByte, &lastByteCount, &readBuffer)
-
-			if err := decompressFullByte(readBuffer, &leftOverByte, &leftOverByteCount, &currentNode, &root, writer); err != nil {
-				return fmt.Errorf(constants.ERROR_COMPRESS, err)
-			}
+			return finalizeDecompression(ctx.state, ctx.writer, ctx.root)
 		}
 
-		loopFlag = 1
-	}
+		if err := processDecompressionBuffer(readBuffer, n, ctx.state, &ctx.currentNode, ctx.root, ctx.writer); err != nil {
+			return err
+		}
 
+		ctx.state.loopFlag = 1
+	}
+}
+
+// reportDecompressionProgress reports the current decompression progress
+func reportDecompressionProgress(progressCallback utils.ProgressCallback, dataRead, limiter uint64, fileName string) {
+	if progressCallback != nil && limiter > 0 {
+		progress := float64(dataRead) / float64(limiter)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+		progressCallback(progress, fmt.Sprintf("Decompressing: %s (%.2f%%)", fileName, progress*100))
+	}
+}
+
+// processDecompressionBuffer processes a buffer during decompression
+func processDecompressionBuffer(readBuffer []byte, n int, state *decompressionState, currentNode **Node, root *Node, writer io.Writer) error {
+	adjustBuffer(state.loopFlag, &n, &state.lastByte, &state.lastByteCount, &readBuffer)
+
+	return decompressFullByte(readBuffer, &state.leftOverByte, &state.leftOverByteCount, currentNode, &root, writer)
+}
+
+// finalizeDecompression handles the final decompression steps
+func finalizeDecompression(state *decompressionState, writer io.Writer, root *Node) error {
+	err := decompressRemainingBits(state.leftOverByte, state.leftOverByteCount, uint8(state.lastByteCount[0]), state.lastByte[0], writer, root)
+	if err != nil {
+		return fmt.Errorf(constants.ERROR_COMPRESS, err)
+	}
 	return nil
 }
 
@@ -461,7 +557,7 @@ func processFileCompression(file utils.FileData, output io.Writer, codes map[run
 	}
 
 	// Compress and write the data
-	compressedLen, err := compressData(file.Reader, output, codes)
+	compressedLen, err := compressDataWithProgress(file.Reader, output, codes, file.Size, filepath.Base(file.Name), progressCallback)
 	if err != nil {
 		return fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
@@ -643,7 +739,7 @@ func processFile(input io.Reader, outputPath string, fileName string, codes map[
 		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
-	if err := decompressData(input, outputFile, codes, compressedSize); err != nil {
+	if err := decompressDataWithProgress(input, outputFile, codes, compressedSize, filepath.Base(fileName), progressCallback); err != nil {
 		return "", fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 	}
 

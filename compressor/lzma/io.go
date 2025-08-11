@@ -31,7 +31,7 @@ func processFileCompression(file utils.FileData, output io.Writer, progressCallb
 		return fmt.Errorf(constants.FILE_WRITE_ERROR, err)
 	}
 
-	compressedLen, err := compressData(file.Reader, output)
+	compressedLen, err := compressDataWithProgress(file.Reader, output, filepath.Base(file.Name), progressCallback)
 	if err != nil {
 		return fmt.Errorf(constants.ERROR_COMPRESS, err)
 	}
@@ -137,7 +137,7 @@ func processFile(input io.Reader, outputPath string, fileName string, progressCa
 		return "", fmt.Errorf(constants.FILE_READ_ERROR, err)
 	}
 
-	if err := decompressData(input, outputFile, compressedSize); err != nil {
+	if err := decompressDataWithProgress(input, outputFile, compressedSize, filepath.Base(fileName), progressCallback); err != nil {
 		return "", fmt.Errorf(constants.ERROR_DECOMPRESS, err)
 	}
 
